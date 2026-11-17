@@ -8,6 +8,7 @@ requires-python = ">=3.13"
 [tool.splent]
 features = [
     "auth",
+    "community",
     "dataset",
     "explore",
     "featuremodel",
