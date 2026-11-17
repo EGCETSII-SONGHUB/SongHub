@@ -19,7 +19,15 @@ dataset_serializer = Serializer(dataset_fields, related_serializers={"files": fi
 DataSetResource = create_resource(DataSet, dataset_serializer)
 
 
+class LegacyDataSetResource(DataSetResource):
+    """Keep the public API error wording stable after the ORM rename."""
+
+    def __init__(self):
+        super().__init__()
+        self.model_name = "DataSet"
+
+
 def init_blueprint_api(api):
     """Function to register resources with the provided Flask-RESTful Api instance."""
-    api.add_resource(DataSetResource, "/api/v1/datasets/", endpoint="datasets")
-    api.add_resource(DataSetResource, "/api/v1/datasets/<int:id>", endpoint="dataset")
+    api.add_resource(LegacyDataSetResource, "/api/v1/datasets/", endpoint="datasets")
+    api.add_resource(LegacyDataSetResource, "/api/v1/datasets/<int:id>", endpoint="dataset")

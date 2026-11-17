@@ -1,0 +1,13 @@
+{% extends "base_template.html" %}
+{% block title %}Upload song dataset{% endblock %}
+{% block content %}
+<h1 class="h2 mb-3"><b>Upload</b> song dataset</h1>
+<p>CSV files must contain the Spotify and YouTube song metrics schema.</p>
+<form action="{{ url_for('songdataset.create_dataset') }}" method="post" enctype="multipart/form-data">
+    <label>Title <input name="title" required></label>
+    <label>Description <textarea name="description" required></textarea></label>
+    <label>Tags <input name="tags"></label>
+    <input type="file" name="file" accept=".csv,text/csv" required>
+    <button class="btn btn-primary" type="submit">Upload song dataset</button>
+</form>
+{% endblock %}

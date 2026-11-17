@@ -60,6 +60,7 @@
 
                             <div class="col-12">
                                 <div class="mb-3">
+                                    <input type="hidden" name="song_filename" id="song_filename">
                                     {{ form.desc.label(class="form-label") }} *
                                     {{ form.desc(rows=4, class="form-control") }}
                                     {% for error in form.desc.errors %}
@@ -362,6 +363,32 @@
                                                         <label class="form-label">Title</label>
                                                         <input type="text" class="form-control" name="feature_models-${formUniqueId}-title">
                                                     </div>
+
+                                                    <h1 class="h3 mb-3 mt-4">SongHub CSV dataset</h1>
+                                                    <form action="{{ url_for('dataset.upload') }}" class="dropzone" id="songDropzone">
+                                                        <div id="song-dropzone-text">Drop a Spotify/YouTube CSV here</div>
+                                                    </form>
+                                                    <span class="text-danger" id="song-alerts" style="display: none"></span>
+                                                    <script>
+                                                        Dropzone.options.songDropzone = {
+                                                            url: "/dataset/file/upload",
+                                                            paramName: "file",
+                                                            maxFiles: 1,
+                                                            maxFilesize: 50,
+                                                            acceptedFiles: ".csv,text/csv",
+                                                            init: function () {
+                                                                this.on("success", function (file, response) {
+                                                                    document.getElementById("song_filename").value = response.filename;
+                                                                    document.getElementById("upload_dataset").style.display = "block";
+                                                                });
+                                                                this.on("error", function (file, message) {
+                                                                    const alert = document.getElementById("song-alerts");
+                                                                    alert.textContent = typeof message === "string" ? message : "Invalid song CSV";
+                                                                    alert.style.display = "block";
+                                                                });
+                                                            }
+                                                        };
+                                                    </script>
                                                 </div>
                                                 <div class="col-12">
                                                     <div class="mb-3">

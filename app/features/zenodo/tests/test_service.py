@@ -15,6 +15,7 @@ from app import db
 from app.features.auth.models import User
 from app.features.dataset.models import Author, DataSet, DSMetaData, PublicationType
 from app.features.featuremodel.models import FeatureModel, FMMetaData
+from app.features.songdataset.models import SongDataset, SongFile, SongMetadata, SongMetrics
 from app.features.zenodo.services import ZenodoService
 
 pytestmark = pytest.mark.service
@@ -29,7 +30,9 @@ def _response(status_code, payload=None):
     return response
 
 
-def _create_dataset(email, publication_type=PublicationType.NONE, tags=None, authors=None):
+def _create_dataset(
+    email, publication_type=PublicationType.NONE, tags=None, authors=None, model_class=DataSet
+):
     """Persist a minimal DataSet graph the service can read metadata from."""
     user = User(email=email, password="ownerpass")
     db.session.add(user)
@@ -49,7 +52,15 @@ def _create_dataset(email, publication_type=PublicationType.NONE, tags=None, aut
         db.session.add(author)
     db.session.commit()
 
-    dataset = DataSet(user_id=user.id, ds_meta_data_id=meta_data.id)
+    kwargs = {"user_id": user.id, "ds_meta_data_id": meta_data.id}
+    if model_class is SongDataset:
+        metrics = SongMetrics()
+        db.session.add(metrics)
+        db.session.flush()
+        kwargs["song_metadata"] = SongMetadata(
+            csv_filename="Spotify_Youtube.csv", columns="[]", song_metrics=metrics
+        )
+    dataset = model_class(**kwargs)
     db.session.add(dataset)
     db.session.commit()
     return dataset
@@ -243,6 +254,26 @@ def test_upload_file_raises_when_zenodo_rejects_the_upload(test_app, clean_datab
 
         # The file handle is not leaked when the upload is rejected.
         assert requests_mock.post.call_args[1]["files"]["file"].closed
+
+
+def test_upload_file_supports_song_files(test_app, clean_database, tmp_path, monkeypatch):
+    with test_app.app_context():
+        dataset = _create_dataset("song-upload@example.com", model_class=SongDataset)
+        song_file = SongFile(name="Spotify_Youtube.csv", checksum="checksum", size=4, dataset_id=dataset.id)
+        db.session.add(song_file)
+        db.session.commit()
+        user = db.session.get(User, dataset.user_id)
+        file_dir = tmp_path / f"user_{user.id}" / f"dataset_{dataset.id}"
+        file_dir.mkdir(parents=True)
+        (file_dir / song_file.name).write_bytes(b"Artist,Track\n")
+        monkeypatch.setattr("app.features.zenodo.services.uploads_folder_name", lambda: str(tmp_path))
+
+        with patch("app.features.zenodo.services.requests") as requests_mock:
+            requests_mock.post.return_value = _response(201, {"id": 7, "filename": song_file.name})
+            result = ZenodoService().upload_file(dataset, 7, song_file, user=user)
+
+        assert result["filename"] == song_file.name
+        assert requests_mock.post.call_args.kwargs["data"] == {"name": song_file.name}
 
 
 # --------------------------------------------------------------------------

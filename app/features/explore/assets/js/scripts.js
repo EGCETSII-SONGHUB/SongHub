@@ -36,6 +36,7 @@ function send_query() {
                 csrf_token: csrfToken,
                 query: document.querySelector('#query').value,
                 publication_type: document.querySelector('#publication_type').value,
+                dataset_type: document.querySelector('#dataset_type').value,
                 sorting: document.querySelector('[name="sorting"]:checked').value,
             };
 
@@ -82,6 +83,7 @@ function send_query() {
                                     <div class="d-flex align-items-center justify-content-between">
                                         <h3><a href="${dataset.url}">${dataset.title}</a></h3>
                                         <div>
+                                            <span class="badge bg-secondary">${dataset.dataset_type === 'song' ? 'Song' : 'UVL'}</span>
                                             <span class="badge bg-primary" style="cursor: pointer;" onclick="set_publication_type_as_query('${dataset.publication_type}')">${dataset.publication_type}</span>
                                         </div>
                                     </div>
@@ -127,6 +129,16 @@ function send_query() {
                                         </div>
 
                                     </div>
+
+                                    ${dataset.song_metrics ? `
+                                    <div class="row mb-2 song-summary">
+                                        <div class="col-md-4 text-secondary">Music summary</div>
+                                        <div class="col-md-8">
+                                            ${dataset.song_metrics.number_of_songs} songs,
+                                            ${dataset.song_metrics.number_of_artists} artists,
+                                            avg. streams ${Number(dataset.song_metrics.average_streams || 0).toFixed(0)}
+                                        </div>
+                                    </div>` : ''}
 
                                     <div class="row">
 

@@ -41,6 +41,31 @@ def create_dataset():
 @dataset_bp.route("/dataset/upload", methods=["POST"])
 @login_required
 def upload_dataset():
+    if request.form.get("song_filename"):
+        from app.features.songdataset.services import SongDatasetService
+        from app.features.zenodo.services import ZenodoService
+
+        try:
+            dataset = SongDatasetService().create_from_upload(
+                {
+                    "title": request.form.get("title"),
+                    "description": request.form.get("desc"),
+                    "publication_type": request.form.get("publication_type", "none"),
+                    "publication_doi": request.form.get("publication_doi"),
+                    "dataset_doi": request.form.get("dataset_doi"),
+                    "tags": request.form.get("tags"),
+                },
+                request.form["song_filename"],
+                current_user,
+            )
+            result = {"message": "Song dataset created locally", "code": 201}
+            try:
+                result["synchronization"] = ZenodoService().synchronize_dataset(dataset)
+            except Exception:
+                result["message"] = "Song dataset saved locally; Zenodo synchronization is pending"
+            return jsonify(result), result["code"]
+        except Exception as exc:
+            return jsonify({"message": str(exc)}), 400
     form = DataSetForm()
     if not form.validate_on_submit():
         return jsonify({"message": form.errors}), 400
@@ -62,7 +87,15 @@ def list_dataset():
 @dataset_bp.route("/dataset/file/upload", methods=["POST"])
 @login_required
 def upload():
-    result = dataset_service.save_temp_uvl(request.files.get("file"), current_user)
+    uploaded = request.files.get("file")
+    if uploaded and uploaded.filename.lower().endswith(".csv"):
+        from app.features.songdataset.services import SongDatasetService
+
+        result = SongDatasetService().save_temp_csv(uploaded, current_user)
+    else:
+        from app.features.featuremodel.services import UVLUploadService
+
+        result = UVLUploadService().save_temp_uvl(uploaded, current_user)
     payload = {"message": result["message"]}
     if "filename" in result:
         payload["filename"] = result["filename"]

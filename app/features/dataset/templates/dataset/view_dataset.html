@@ -33,6 +33,49 @@
 
     <div class="col-xl-8 col-lg-12 col-md-12 col-sm-12">
 
+        {% if dataset.dataset_type == "song" %}
+        <div class="card">
+            <div class="card-body">
+                <h3>Song statistics</h3>
+                <div id="song-summary" class="row"></div>
+                <input id="song-filter" class="form-control mb-3" placeholder="Filter artist, track or album">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="song-table">
+                        <thead><tr><th>Artist</th><th>Track</th><th>Album</th><th>Streams</th><th>Views</th><th>Likes</th><th>Danceability</th><th>Energy</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <script>
+            fetch("{{ url_for('songdataset.preview_dataset', dataset_id=dataset.id) }}")
+                .then(response => response.json())
+                .then(data => {
+                    const summary = document.getElementById("song-summary");
+                    ["number_of_songs", "number_of_artists", "average_stream", "average_views", "average_likes"]
+                        .forEach(key => summary.innerHTML += `<div class="col-md-3"><strong>${key.replaceAll("_", " ")}</strong><br>${Number(data.summary[key] || 0).toFixed(2)}</div>`);
+                    const body = document.querySelector("#song-table tbody");
+                    const fields = ["Artist", "Track", "Album", "Stream", "Views", "Likes", "Danceability", "Energy"];
+                    const render = () => {
+                        const filter = document.getElementById("song-filter").value.toLowerCase();
+                        body.replaceChildren();
+                        data.rows.filter(row => [row.Artist, row.Track, row.Album].join(" ").toLowerCase().includes(filter))
+                            .forEach(row => {
+                                const tr = document.createElement("tr");
+                                fields.forEach(field => {
+                                    const cell = document.createElement("td");
+                                    cell.textContent = row[field] || "";
+                                    tr.appendChild(cell);
+                                });
+                                body.appendChild(tr);
+                            });
+                    };
+                    document.getElementById("song-filter").addEventListener("input", render);
+                    render();
+                });
+        </script>
+        {% endif %}
+
         <div class="card">
             <div class="card-body">
                 <div class="d-flex align-items-center justify-content-between">
@@ -89,8 +132,6 @@
                         </p>
                         {% endfor %}
                     </div>
-
-
                 </div>
 
                 {% if dataset.ds_meta_data.publication_doi %}
@@ -131,7 +172,7 @@
                             </div>
                         {% else %}
                             <div class="col-md-8 col-12">
-                                <a href="https://zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}" target="_blank">
+                                <a href="https://sandbox.zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}" target="_blank">
                                     https://sandbox.zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}
                                 </a>
                             </div>
@@ -186,6 +227,7 @@
 
         </div>
 
+        {% if dataset.dataset_type != "song" %}
         <div class="card">
 
             <div class="card-body">
@@ -227,6 +269,7 @@
             </div>
 
         </div>
+        {% endif %}
 
 
     </div>
@@ -239,7 +282,7 @@
 
                 <div class="row">
                     <div class="col-12 d-flex justify-content-between align-items-center">
-                        <h4 style="margin-bottom: 0px">UVL models</h4>
+                        <h4 style="margin-bottom: 0px">{{ "Song files" if dataset.dataset_type == "song" else "UVL models" }}</h4>
                         <h4 style="margin-bottom: 0px;"><span class="badge bg-dark">{{ dataset.get_files_count() }}</span></h4>
                     </div>
                 </div>
@@ -248,6 +291,14 @@
             </div>
             
 
+            {% if dataset.dataset_type == "song" %}
+            {% for file in dataset.song_files %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i data-feather="file-text"></i> {{ file.name }}<br><small class="text-muted">({{ file.get_formatted_size() }})</small></span>
+                        <a class="btn btn-primary btn-sm" href="{{ url_for('songdataset.download_song_file', file_id=file.id) }}">Download</a>
+                    </div>
+            {% endfor %}
+            {% else %}
             {% for feature_model in dataset.feature_models %}
                 {% for file in feature_model.files %}
                     <div class="list-group-item">
@@ -324,6 +375,7 @@
                     </div>
                 {% endfor %}
             {% endfor %}
+                {% endif %}
         </div>
         
         

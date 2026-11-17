@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from splent_framework.seeders.BaseSeeder import BaseSeeder
 
 from app.features.auth.models import User
-from app.features.dataset.models import Author, DataSet, DSMetaData, DSMetrics, PublicationType
+from app.features.dataset.models import Author, DSMetaData, DSMetrics, PublicationType, UVLDataset
 from app.features.featuremodel.models import FeatureModel, FMMetaData
 from app.features.hubfile.models import Hubfile
 
@@ -57,7 +57,7 @@ class DataSetSeeder(BaseSeeder):
 
         # Create DataSet instances
         datasets = [
-            DataSet(
+            UVLDataset(
                 user_id=user1.id if i % 2 == 0 else user2.id,
                 ds_meta_data_id=seeded_ds_meta_data[i].id,
                 created_at=datetime.now(timezone.utc),

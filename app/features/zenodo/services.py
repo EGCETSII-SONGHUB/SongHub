@@ -9,7 +9,6 @@ from splent_framework.configuration.configuration import uploads_folder_name
 from splent_framework.services.BaseService import BaseService
 
 from app.features.dataset.models import DataSet
-from app.features.featuremodel.models import FeatureModel
 from app.features.zenodo.repositories import ZenodoRepository
 
 logger = logging.getLogger(__name__)
@@ -79,7 +78,25 @@ class ZenodoService(BaseService):
                 }
             }
 
-            response = requests.post(self.ZENODO_API_URL, json=data, params=self.params, headers=self.headers)
+            try:
+                response = requests.post(
+                    self.ZENODO_API_URL,
+                    json=data,
+                    params=self.params,
+                    headers=self.headers,
+                    timeout=15,
+                )
+            except requests.RequestException as exc:
+                logger.warning("Zenodo connection check failed: %s", exc)
+                return jsonify(
+                    {
+                        "success": False,
+                        "messages": [
+                            "Failed to create test deposition on Zenodo. "
+                            f"Response code: connection error ({exc})"
+                        ],
+                    }
+                )
 
             if response.status_code != 201:
                 return jsonify(
@@ -97,7 +114,13 @@ class ZenodoService(BaseService):
             data = {"name": "test_file.txt"}
             publish_url = f"{self.ZENODO_API_URL}/{deposition_id}/files"
             with open(file_path, "rb") as file:
-                response = requests.post(publish_url, params=self.params, data=data, files={"file": file})
+                response = requests.post(
+                    publish_url,
+                    params=self.params,
+                    data=data,
+                    files={"file": file},
+                    timeout=15,
+                )
 
             logger.info(f"Publish URL: {publish_url}")
             logger.info(f"Response Status Code: {response.status_code}")
@@ -108,7 +131,10 @@ class ZenodoService(BaseService):
                 success = False
 
             # Step 3: Delete the deposition
-            response = requests.delete(f"{self.ZENODO_API_URL}/{deposition_id}", params=self.params)
+            response = requests.delete(
+                f"{self.ZENODO_API_URL}/{deposition_id}",
+                params=self.params,
+            )
 
             if response.status_code != 204:
                 messages.append(f"Failed to delete test deposition on Zenodo. Response code: {response.status_code}")
@@ -160,7 +186,9 @@ class ZenodoService(BaseService):
                 for author in dataset.ds_meta_data.authors
             ],
             "keywords": (
-                ["uvlhub"] if not dataset.ds_meta_data.tags else dataset.ds_meta_data.tags.split(", ") + ["uvlhub"]
+                [self._dataset_keyword(dataset)]
+                if not dataset.ds_meta_data.tags
+                else dataset.ds_meta_data.tags.split(", ") + [self._dataset_keyword(dataset)]
             ),
             "access_right": "open",
             "license": "CC-BY-4.0",
@@ -174,7 +202,11 @@ class ZenodoService(BaseService):
             raise Exception(error_message)
         return response.json()
 
-    def upload_file(self, dataset: DataSet, deposition_id: int, feature_model: FeatureModel, user=None) -> dict:
+    @staticmethod
+    def _dataset_keyword(dataset: DataSet) -> str:
+        return "songhub" if dataset.dataset_type == "song" else "uvlhub"
+
+    def upload_file(self, dataset: DataSet, deposition_id: int, feature_model, user=None) -> dict:
         """
         Upload a file to a deposition in Zenodo.
 
@@ -186,10 +218,12 @@ class ZenodoService(BaseService):
         Returns:
             dict: The response in JSON format with the details of the uploaded file.
         """
-        uvl_filename = feature_model.fm_meta_data.uvl_filename
-        data = {"name": uvl_filename}
+        filename = getattr(feature_model, "name", None)
+        if not filename:
+            filename = feature_model.fm_meta_data.uvl_filename
+        data = {"name": filename}
         user_id = current_user.id if user is None else user.id
-        file_path = os.path.join(uploads_folder_name(), f"user_{str(user_id)}", f"dataset_{dataset.id}/", uvl_filename)
+        file_path = os.path.join(uploads_folder_name(), f"user_{str(user_id)}", f"dataset_{dataset.id}/", filename)
 
         publish_url = f"{self.ZENODO_API_URL}/{deposition_id}/files"
         with open(file_path, "rb") as file:
@@ -198,6 +232,26 @@ class ZenodoService(BaseService):
             error_message = f"Failed to upload files. Error details: {response.json()}"
             raise Exception(error_message)
         return response.json()
+
+    def synchronize_dataset(self, dataset: DataSet) -> dict:
+        """Create, upload and publish any dataset implementation.
+
+        Both UVL FeatureModels and SongDataset files expose a ``files()`` API,
+        so Zenodo remains shared infrastructure rather than a domain service.
+        """
+
+        deposition = self.create_new_deposition(dataset)
+        deposition_id = deposition["id"]
+        for file in dataset.files():
+            self.upload_file(dataset, deposition_id, file)
+        self.publish_deposition(deposition_id)
+        doi = self.get_doi(deposition_id)
+        dataset.ds_meta_data.deposition_id = deposition_id
+        dataset.ds_meta_data.dataset_doi = doi
+        from app import db
+
+        db.session.commit()
+        return {"status": "synchronized", "deposition_id": deposition_id, "doi": doi}
 
     def publish_deposition(self, deposition_id: int) -> dict:
         """

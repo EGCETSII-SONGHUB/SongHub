@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+import os
 
 from flask import request
 from sqlalchemy import Enum as SQLAlchemyEnum
@@ -64,15 +65,24 @@ class DSMetaData(db.Model):
     authors = db.relationship("Author", backref="ds_meta_data", lazy=True, cascade="all, delete")
 
 
-class DataSet(db.Model):
+class BaseDataset(db.Model):
+    """Common persisted dataset metadata shared by every supported domain."""
+
+    __tablename__ = "data_set"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    dataset_type = db.Column(db.String(32), nullable=False, default="base", index=True)
 
     ds_meta_data_id = db.Column(db.Integer, db.ForeignKey("ds_meta_data.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     ds_meta_data = db.relationship("DSMetaData", backref=db.backref("data_set", uselist=False))
     feature_models = db.relationship("FeatureModel", backref="data_set", lazy=True, cascade="all, delete")
+
+    __mapper_args__ = {
+        "polymorphic_on": dataset_type,
+        "polymorphic_identity": "base",
+    }
 
     def name(self):
         return self.ds_meta_data.title
@@ -89,6 +99,8 @@ class DataSet(db.Model):
 
     def get_zenodo_url(self):
         if self.ds_meta_data.dataset_doi and self.ds_meta_data.deposition_id:
+            if "sandbox" in os.getenv("ZENODO_API_URL", ""):
+                return f"https://sandbox.zenodo.org/records/{self.ds_meta_data.deposition_id}"
             return f"https://zenodo.org/record/{self.ds_meta_data.deposition_id}"
         return None
 
@@ -109,7 +121,7 @@ class DataSet(db.Model):
         return DataSetService().get_uvlhub_doi(self)
 
     def to_dict(self):
-        return {
+        result = {
             "title": self.ds_meta_data.title,
             "id": self.id,
             "created_at": self.created_at,
@@ -123,14 +135,34 @@ class DataSet(db.Model):
             "url": self.get_uvlhub_doi(),
             "download": f'{request.host_url.rstrip("/")}/dataset/download/{self.id}',
             "zenodo": self.get_zenodo_url(),
-            "files": [file.to_dict() for fm in self.feature_models for file in fm.files],
+            "dataset_type": self.dataset_type,
+            "files": [file.to_dict() for file in self.files()],
             "files_count": self.get_files_count(),
             "total_size_in_bytes": self.get_file_total_size(),
             "total_size_in_human_format": self.get_file_total_size_for_human(),
         }
+        if self.dataset_type == "song":
+            result["song_metrics"] = {
+                "number_of_songs": self.song_metrics.number_of_songs,
+                "number_of_artists": self.song_metrics.number_of_artists,
+                "average_streams": self.song_metrics.average_streams,
+                "average_views": self.song_metrics.average_views,
+                "average_likes": self.song_metrics.average_likes,
+            }
+        return result
 
     def __repr__(self):
-        return f"DataSet<{self.id}>"
+        return f"BaseDataset<{self.id}>"
+
+
+# Compatibility name retained for existing UVL callers and integrations.
+DataSet = BaseDataset
+
+
+class UVLDataset(BaseDataset):
+    """UVL dataset specialization kept compatible with the legacy model."""
+
+    __mapper_args__ = {"polymorphic_identity": "uvl"}
 
 
 class DSDownloadRecord(db.Model):
