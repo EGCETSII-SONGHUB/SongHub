@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------------
 # Run Tests Workflow
-# This workflow runs pytest on every push and pull request (targeting main).
+# This workflow runs pytest on every push and pull request (targeting main and trunk).
 # It sets up a MariaDB service container and configures environment
 # variables for both the service and the test environment.
 # ----------------------------------------------------------------------------
@@ -9,9 +9,9 @@ name: Pytest
 
 on:
   push:
-    branches: [main]
+    branches: [main, trunk]
   pull_request:
-    branches: [main]
+    branches: [main, trunk]
 
 jobs:
   pytest:
@@ -66,4 +66,4 @@ jobs:
 
       # Step 4: Run the pytest test suite (ignoring Selenium tests)
       - name: Run Tests
-        run: pytest app/features/ --ignore-glob='*selenium*'
+        run: pytest app/features/ tests/ --ignore-glob='*selenium*'
