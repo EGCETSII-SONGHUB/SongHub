@@ -1,4 +1,6 @@
 import logging
+import os
+import shutil
 import uuid
 
 from flask import (
@@ -42,6 +44,7 @@ def create_dataset():
 @login_required
 def upload_dataset():
     if request.form.get("song_filename"):
+        from app.features.songdataset.routes import _extract_extra_authors
         from app.features.songdataset.services import SongDatasetService
         from app.features.zenodo.services import ZenodoService
 
@@ -57,12 +60,16 @@ def upload_dataset():
                 },
                 request.form["song_filename"],
                 current_user,
+                extra_authors=_extract_extra_authors(request.form),
             )
             result = {"message": "Song dataset created locally", "code": 201}
             try:
                 result["synchronization"] = ZenodoService().synchronize_dataset(dataset)
             except Exception:
                 result["message"] = "Song dataset saved locally; Zenodo synchronization is pending"
+            temp_path = current_user.temp_folder()
+            if os.path.isdir(temp_path):
+                shutil.rmtree(temp_path)
             return jsonify(result), result["code"]
         except Exception as exc:
             return jsonify({"message": str(exc)}), 400
@@ -88,7 +95,7 @@ def list_dataset():
 @login_required
 def upload():
     uploaded = request.files.get("file")
-    if uploaded and uploaded.filename.lower().endswith(".csv"):
+    if uploaded and uploaded.filename and uploaded.filename.lower().endswith(".csv"):
         from app.features.songdataset.services import SongDatasetService
 
         result = SongDatasetService().save_temp_csv(uploaded, current_user)

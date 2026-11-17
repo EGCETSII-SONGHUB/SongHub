@@ -6,7 +6,15 @@ from flask_login import current_user
 from splent_framework.repositories.BaseRepository import BaseRepository
 from sqlalchemy import desc
 
-from app.features.dataset.models import Author, DataSet, DOIMapping, DSDownloadRecord, DSMetaData, DSViewRecord
+from app.features.dataset.models import (
+    Author,
+    BaseDataset,
+    DOIMapping,
+    DSDownloadRecord,
+    DSMetaData,
+    DSViewRecord,
+    UVLDataset,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +50,14 @@ class DSViewRecordRepository(BaseRepository):
     def total_dataset_views(self) -> int:
         return self.model.query.count()
 
-    def the_record_exists(self, dataset: DataSet, user_cookie: str):
+    def the_record_exists(self, dataset: BaseDataset, user_cookie: str):
         return self.model.query.filter_by(
             user_id=current_user.id if current_user.is_authenticated else None,
             dataset_id=dataset.id,
             view_cookie=user_cookie,
         ).first()
 
-    def create_new_record(self, dataset: DataSet, user_cookie: str) -> DSViewRecord:
+    def create_new_record(self, dataset: BaseDataset, user_cookie: str) -> DSViewRecord:
         return self.create(
             user_id=current_user.id if current_user.is_authenticated else None,
             dataset_id=dataset.id,
@@ -60,28 +68,44 @@ class DSViewRecordRepository(BaseRepository):
 
 class DataSetRepository(BaseRepository):
     def __init__(self):
-        super().__init__(DataSet)
+        super().__init__(BaseDataset)
 
-    def get_synchronized(self, current_user_id: int) -> DataSet:
+    def create(self, commit: bool = True, **kwargs):
+        if kwargs.get("dataset_type", "uvl") == "uvl":
+            clean_kwargs = {key: value for key, value in kwargs.items() if key != "dataset_type"}
+            instance = UVLDataset(**clean_kwargs)
+            self.session.add(instance)
+            if commit:
+                self.session.commit()
+            else:
+                self.session.flush()
+            return instance
+        return super().create(commit=commit, **kwargs)
+
+    def get_synchronized(self, current_user_id: int):
         return (
             self.model.query.join(DSMetaData)
-            .filter(DataSet.user_id == current_user_id, DSMetaData.dataset_doi.isnot(None))
+            .filter(BaseDataset.user_id == current_user_id, DSMetaData.dataset_doi.isnot(None))
             .order_by(self.model.created_at.desc())
             .all()
         )
 
-    def get_unsynchronized(self, current_user_id: int) -> DataSet:
+    def get_unsynchronized(self, current_user_id: int):
         return (
             self.model.query.join(DSMetaData)
-            .filter(DataSet.user_id == current_user_id, DSMetaData.dataset_doi.is_(None))
+            .filter(BaseDataset.user_id == current_user_id, DSMetaData.dataset_doi.is_(None))
             .order_by(self.model.created_at.desc())
             .all()
         )
 
-    def get_unsynchronized_dataset(self, current_user_id: int, dataset_id: int) -> DataSet:
+    def get_unsynchronized_dataset(self, current_user_id: int, dataset_id: int):
         return (
             self.model.query.join(DSMetaData)
-            .filter(DataSet.user_id == current_user_id, DataSet.id == dataset_id, DSMetaData.dataset_doi.is_(None))
+            .filter(
+                BaseDataset.user_id == current_user_id,
+                BaseDataset.id == dataset_id,
+                DSMetaData.dataset_doi.is_(None),
+            )
             .first()
         )
 
@@ -93,13 +117,13 @@ class DataSetRepository(BaseRepository):
 
     def paginate_for_user(self, user_id: int, page: int, per_page: int):
         return (
-            self.model.query.filter(DataSet.user_id == user_id)
-            .order_by(DataSet.created_at.desc())
+            self.model.query.filter(BaseDataset.user_id == user_id)
+            .order_by(BaseDataset.created_at.desc())
             .paginate(page=page, per_page=per_page, error_out=False)
         )
 
     def count_for_user(self, user_id: int) -> int:
-        return self.model.query.filter(DataSet.user_id == user_id).count()
+        return self.model.query.filter(BaseDataset.user_id == user_id).count()
 
     def latest_synchronized(self):
         return (
@@ -115,5 +139,5 @@ class DOIMappingRepository(BaseRepository):
     def __init__(self):
         super().__init__(DOIMapping)
 
-    def get_new_doi(self, old_doi: str) -> str:
+    def get_new_doi(self, old_doi: str):
         return self.model.query.filter_by(dataset_doi_old=old_doi).first()

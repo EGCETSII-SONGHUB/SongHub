@@ -1,7 +1,7 @@
 from splent_framework.resources.generic_resource import create_resource
 from splent_framework.serialisers.serializer import Serializer
 
-from app.features.dataset.models import DataSet
+from app.features.dataset.models import BaseDataset
 
 file_fields = {"file_id": "id", "file_name": "name", "size": "get_formatted_size"}
 file_serializer = Serializer(file_fields)
@@ -16,7 +16,7 @@ dataset_fields = {
 
 dataset_serializer = Serializer(dataset_fields, related_serializers={"files": file_serializer})
 
-DataSetResource = create_resource(DataSet, dataset_serializer)
+DataSetResource = create_resource(BaseDataset, dataset_serializer)
 
 
 class LegacyDataSetResource(DataSetResource):

@@ -1,8 +1,7 @@
-import os
-
 from splent_framework.services.BaseService import BaseService
 
 from app.features.featuremodel.repositories import FeatureModelRepository, FMMetaDataRepository
+from app.features.featuremodel.uvl_dataset_service import UVLDatasetService
 from app.features.hubfile.services import HubfileService
 
 
@@ -10,29 +9,7 @@ class UVLUploadService:
     """UVL-only temporary upload handling kept outside common dataset routes."""
 
     def save_temp_uvl(self, file, current_user) -> dict:
-        if not file or not file.filename.endswith(".uvl"):
-            return {"status": "error", "code": 400, "message": "No valid file"}
-        temp_folder = current_user.temp_folder()
-        os.makedirs(temp_folder, exist_ok=True)
-        filename = file.filename
-        target = os.path.join(temp_folder, filename)
-        if os.path.exists(target):
-            base, ext = os.path.splitext(filename)
-            index = 1
-            while os.path.exists(os.path.join(temp_folder, f"{base} ({index}){ext}")):
-                index += 1
-            filename = f"{base} ({index}){ext}"
-            target = os.path.join(temp_folder, filename)
-        try:
-            file.save(target)
-        except OSError as exc:
-            return {"status": "error", "code": 500, "message": str(exc)}
-        return {
-            "status": "ok",
-            "code": 200,
-            "message": "UVL uploaded and validated successfully",
-            "filename": filename,
-        }
+        return UVLDatasetService().save_temp_uvl(file, current_user)
 
 
 class FeatureModelService(BaseService):

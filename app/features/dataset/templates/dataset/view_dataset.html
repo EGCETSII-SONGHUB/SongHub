@@ -26,6 +26,15 @@
             Explore more datasets
         </a>
     </div>
+    {% if dataset.dataset_type == "song" and current_user.is_authenticated and current_user.id == dataset.user_id %}
+    <div class="col-6 text-end">
+        <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=dataset.id) }}"
+           class="btn btn-outline-secondary btn-sm" id="edit-song-dataset" style="border-radius: 5px;">
+            <i data-feather="edit" class="center-button-icon"></i>
+            Edit song dataset
+        </a>
+    </div>
+    {% endif %}
 
 </div>
 
@@ -37,30 +46,69 @@
         <div class="card">
             <div class="card-body">
                 <h3>Song statistics</h3>
-                <div id="song-summary" class="row"></div>
-                <input id="song-filter" class="form-control mb-3" placeholder="Filter artist, track or album">
+                <div id="song-summary" class="row mb-3"></div>
+                <input id="song-filter" class="form-control mb-3" placeholder="Filter artist, track, album or channel">
                 <div class="table-responsive">
                     <table class="table table-striped" id="song-table">
                         <thead><tr><th>Artist</th><th>Track</th><th>Album</th><th>Streams</th><th>Views</th><th>Likes</th><th>Danceability</th><th>Energy</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted" id="song-page-info"></small>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="song-prev" disabled>Previous</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="song-next" disabled>Next</button>
+                    </div>
+                </div>
             </div>
         </div>
         <script>
-            fetch("{{ url_for('songdataset.preview_dataset', dataset_id=dataset.id) }}")
-                .then(response => response.json())
-                .then(data => {
+            (() => {
+                const baseUrl = "{{ url_for('songdataset.preview_dataset', dataset_id=dataset.id) }}";
+                const limit = 25;
+                let offset = 0;
+                let controller = null;
+                let summaryRendered = false;
+
+                const formatInt = (val) => Math.round(Number(val || 0)).toLocaleString();
+                const formatAvg = (val) => Number(val || 0).toLocaleString(undefined, {maximumFractionDigits: 2});
+
+                const renderSummary = (summaryData) => {
+                    if (summaryRendered) return;
+                    summaryRendered = true;
                     const summary = document.getElementById("song-summary");
-                    ["number_of_songs", "number_of_artists", "average_stream", "average_views", "average_likes"]
-                        .forEach(key => summary.innerHTML += `<div class="col-md-3"><strong>${key.replaceAll("_", " ")}</strong><br>${Number(data.summary[key] || 0).toFixed(2)}</div>`);
-                    const body = document.querySelector("#song-table tbody");
-                    const fields = ["Artist", "Track", "Album", "Stream", "Views", "Likes", "Danceability", "Energy"];
-                    const render = () => {
-                        const filter = document.getElementById("song-filter").value.toLowerCase();
-                        body.replaceChildren();
-                        data.rows.filter(row => [row.Artist, row.Track, row.Album].join(" ").toLowerCase().includes(filter))
-                            .forEach(row => {
+                    const items = [
+                        ["Songs", formatInt(summaryData.number_of_songs)],
+                        ["Artists", formatInt(summaryData.number_of_artists)],
+                        ["Avg. Streams", formatAvg(summaryData.average_streams ?? summaryData.average_stream)],
+                        ["Avg. Views", formatAvg(summaryData.average_views)],
+                        ["Avg. Likes", formatAvg(summaryData.average_likes)],
+                    ];
+                    summary.replaceChildren();
+                    items.forEach(([label, value]) => {
+                        const col = document.createElement("div");
+                        col.className = "col-md-4 col-6 mb-2";
+                        col.innerHTML = `<strong class="text-muted d-block">${label}</strong><span>${value}</span>`;
+                        summary.appendChild(col);
+                    });
+                };
+
+                const loadPage = () => {
+                    const q = document.getElementById("song-filter").value.trim();
+                    if (controller) controller.abort();
+                    controller = new AbortController();
+
+                    fetch(`${baseUrl}?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`, {
+                        signal: controller.signal,
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            renderSummary(data.summary || {});
+                            const body = document.querySelector("#song-table tbody");
+                            const fields = ["Artist", "Track", "Album", "Stream", "Views", "Likes", "Danceability", "Energy"];
+                            body.replaceChildren();
+                            (data.rows || []).forEach(row => {
                                 const tr = document.createElement("tr");
                                 fields.forEach(field => {
                                     const cell = document.createElement("td");
@@ -69,10 +117,34 @@
                                 });
                                 body.appendChild(tr);
                             });
-                    };
-                    document.getElementById("song-filter").addEventListener("input", render);
-                    render();
+
+                            const total = data.total ?? (data.rows || []).length;
+                            const start = total === 0 ? 0 : offset + 1;
+                            const end = Math.min(offset + (data.rows || []).length, total);
+                            document.getElementById("song-page-info").textContent =
+                                `Showing ${start}-${end} of ${total} tracks`;
+                            document.getElementById("song-prev").disabled = offset <= 0;
+                            document.getElementById("song-next").disabled = offset + limit >= total;
+                        })
+                        .catch(err => {
+                            if (err.name !== "AbortError") throw err;
+                        });
+                };
+
+                document.getElementById("song-filter").addEventListener("input", () => {
+                    offset = 0;
+                    loadPage();
                 });
+                document.getElementById("song-prev").addEventListener("click", () => {
+                    offset = Math.max(0, offset - limit);
+                    loadPage();
+                });
+                document.getElementById("song-next").addEventListener("click", () => {
+                    offset += limit;
+                    loadPage();
+                });
+                loadPage();
+            })();
         </script>
         {% endif %}
 
@@ -388,6 +460,7 @@
     
 </div>
 
+{% if dataset.dataset_type != "song" %}
 <!-- Modal-->
 <div class="modal fade" id="fileViewerModal" tabindex="-1" aria-labelledby="fileViewerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" style="height: 80vh; display: flex; align-items: center;">
@@ -415,14 +488,16 @@
 </div>
 
 <script type="text/javascript" src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
-
-
+{% endif %}
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         feather.replace();
     });
+</script>
 
+{% if dataset.dataset_type != "song" %}
+<script>
     var currentFileId;
 
     function viewFile(fileId) {
@@ -547,5 +622,6 @@
         });
     }
 </script>
+{% endif %}
 
 {% endblock %}

@@ -1,13 +1,120 @@
 {% extends "base_template.html" %}
+
 {% block title %}Upload song dataset{% endblock %}
+
 {% block content %}
 <h1 class="h2 mb-3"><b>Upload</b> song dataset</h1>
-<p>CSV files must contain the Spotify and YouTube song metrics schema.</p>
-<form action="{{ url_for('songdataset.create_dataset') }}" method="post" enctype="multipart/form-data">
-    <label>Title <input name="title" required></label>
-    <label>Description <textarea name="description" required></textarea></label>
-    <label>Tags <input name="tags"></label>
-    <input type="file" name="file" accept=".csv,text/csv" required>
-    <button class="btn btn-primary" type="submit">Upload song dataset</button>
-</form>
+
+{% if error %}
+<div class="alert alert-danger" id="song-form-error" role="alert">
+    {{ error }}
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-xl-6 col-lg-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Dataset metadata</h5>
+            </div>
+            <div class="card-body">
+                <form id="song-upload-form" action="{{ url_for('songdataset.create_dataset') }}" method="post" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <input type="hidden" name="filename" id="song_temp_filename" value="">
+
+                    <div class="mb-3">
+                        <label class="form-label" for="song_title">Title *</label>
+                        <input class="form-control" id="song_title" name="title" minlength="3" maxlength="120" required
+                               value="{{ form.title.data or '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="song_description">Description *</label>
+                        <textarea class="form-control" id="song_description" name="description" rows="4" minlength="3" required>{{ form.description.data or '' }}</textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="song_publication_type">Publication type</label>
+                            {{ form.publication_type(class="form-control", id="song_publication_type") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="song_publication_doi">Publication DOI</label>
+                            <input class="form-control" id="song_publication_doi" name="publication_doi" type="url"
+                                   placeholder="https://doi.org/..." value="{{ form.publication_doi.data or '' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="song_tags">Tags (separated by commas)</label>
+                        <input class="form-control" id="song_tags" name="tags" maxlength="120"
+                               placeholder="spotify, youtube, pop" value="{{ form.tags.data or '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Authors</label>
+                        <p class="text-muted small mb-2">
+                            Primary author: {{ current_user.profile.surname ~ ', ' ~ current_user.profile.name if current_user.profile else current_user.email }}
+                        </p>
+                        <div id="song-authors-container"></div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="song-add-author">Add author</button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="song_file_input">CSV file (or use Dropzone on the right) *</label>
+                        <input class="form-control" id="song_file_input" type="file" name="file" accept=".csv,text/csv" required>
+                    </div>
+
+                    <button class="btn btn-primary" id="song_upload_submit" type="submit">
+                        <i data-feather="upload" class="center-button-icon"></i> Upload song dataset
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-6 col-lg-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Spotify &amp; YouTube CSV validator</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">
+                    Drop a <code>.csv</code> file conforming to the 26-column Spotify and YouTube track metrics schema.
+                </p>
+
+                <form action="{{ url_for('songdataset.upload_file') }}" class="dropzone" id="songUploadDropzone">
+                    <div class="dz-message" data-dz-message>
+                        <span>Drop a Spotify/YouTube <code>.csv</code> file here or click to browse</span>
+                    </div>
+                </form>
+
+                <div class="alert alert-danger mt-3" id="song-upload-alerts" style="display: none" role="alert"></div>
+
+                <div class="card bg-light mt-3" id="song-dropzone-preview" style="display: none">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0" id="song-preview-filename"></h6>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="song-clear-csv">Remove CSV</button>
+                        </div>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <small class="text-muted d-block">Songs</small>
+                                <strong id="song-preview-rows">0</strong>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Artists</small>
+                                <strong id="song-preview-artists">0</strong>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted d-block">Avg. Streams</small>
+                                <strong id="song-preview-streams">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

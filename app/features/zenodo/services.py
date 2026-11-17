@@ -92,8 +92,7 @@ class ZenodoService(BaseService):
                     {
                         "success": False,
                         "messages": [
-                            "Failed to create test deposition on Zenodo. "
-                            f"Response code: connection error ({exc})"
+                            "Failed to create test deposition on Zenodo. " f"Response code: connection error ({exc})"
                         ],
                     }
                 )
@@ -186,9 +185,10 @@ class ZenodoService(BaseService):
                 for author in dataset.ds_meta_data.authors
             ],
             "keywords": (
-                [self._dataset_keyword(dataset)]
-                if not dataset.ds_meta_data.tags
-                else dataset.ds_meta_data.tags.split(", ") + [self._dataset_keyword(dataset)]
+                [tag.strip() for tag in dataset.ds_meta_data.tags.split(",") if tag.strip()]
+                + [self._dataset_keyword(dataset)]
+                if dataset.ds_meta_data.tags
+                else [self._dataset_keyword(dataset)]
             ),
             "access_right": "open",
             "license": "CC-BY-4.0",
@@ -222,7 +222,12 @@ class ZenodoService(BaseService):
         if not filename:
             filename = feature_model.fm_meta_data.uvl_filename
         data = {"name": filename}
-        user_id = current_user.id if user is None else user.id
+        if user is not None:
+            user_id = user.id
+        elif current_user and getattr(current_user, "is_authenticated", False):
+            user_id = current_user.id
+        else:
+            user_id = dataset.user_id
         file_path = os.path.join(uploads_folder_name(), f"user_{str(user_id)}", f"dataset_{dataset.id}/", filename)
 
         publish_url = f"{self.ZENODO_API_URL}/{deposition_id}/files"

@@ -211,6 +211,12 @@ function clearFilters() {
     queryInput.value = "";
     // queryInput.dispatchEvent(new Event('input', {bubbles: true}));
 
+    // Reset the dataset type to its default value
+    let datasetTypeSelect = document.querySelector('#dataset_type');
+    if (datasetTypeSelect) {
+        datasetTypeSelect.value = "any";
+    }
+
     // Reset the publication type to its default value
     let publicationTypeSelect = document.querySelector('#publication_type');
     publicationTypeSelect.value = "any"; // replace "any" with whatever your default value is

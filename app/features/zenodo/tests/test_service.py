@@ -30,9 +30,7 @@ def _response(status_code, payload=None):
     return response
 
 
-def _create_dataset(
-    email, publication_type=PublicationType.NONE, tags=None, authors=None, model_class=DataSet
-):
+def _create_dataset(email, publication_type=PublicationType.NONE, tags=None, authors=None, model_class=DataSet):
     """Persist a minimal DataSet graph the service can read metadata from."""
     user = User(email=email, password="ownerpass")
     db.session.add(user)
@@ -57,9 +55,7 @@ def _create_dataset(
         metrics = SongMetrics()
         db.session.add(metrics)
         db.session.flush()
-        kwargs["song_metadata"] = SongMetadata(
-            csv_filename="Spotify_Youtube.csv", columns="[]", song_metrics=metrics
-        )
+        kwargs["song_metadata"] = SongMetadata(csv_filename="Spotify_Youtube.csv", columns="[]", song_metrics=metrics)
     dataset = model_class(**kwargs)
     db.session.add(dataset)
     db.session.commit()
@@ -274,6 +270,35 @@ def test_upload_file_supports_song_files(test_app, clean_database, tmp_path, mon
 
         assert result["filename"] == song_file.name
         assert requests_mock.post.call_args.kwargs["data"] == {"name": song_file.name}
+
+
+def test_synchronize_dataset_publishes_song_dataset_without_request_user(
+    test_app, clean_database, tmp_path, monkeypatch
+):
+    with test_app.app_context():
+        dataset = _create_dataset("song-sync@example.com", tags="rock, spotify", model_class=SongDataset)
+        song_file = SongFile(name="rock.csv", checksum="checksum", size=12, dataset_id=dataset.id)
+        db.session.add(song_file)
+        db.session.commit()
+        file_dir = tmp_path / f"user_{dataset.user_id}" / f"dataset_{dataset.id}"
+        file_dir.mkdir(parents=True)
+        (file_dir / song_file.name).write_bytes(b"Artist,Track\nGorillaz,Feel Good Inc.\n")
+        monkeypatch.setattr("app.features.zenodo.services.uploads_folder_name", lambda: str(tmp_path))
+
+        with patch("app.features.zenodo.services.requests") as requests_mock:
+            requests_mock.post.side_effect = [
+                _response(201, {"id": 88}),
+                _response(201, {"id": 1}),
+                _response(202, {"state": "done"}),
+            ]
+            requests_mock.get.return_value = _response(200, {"id": 88, "doi": "10.5281/zenodo.88"})
+            result = ZenodoService().synchronize_dataset(dataset)
+
+        assert result == {"status": "synchronized", "deposition_id": 88, "doi": "10.5281/zenodo.88"}
+        assert dataset.ds_meta_data.deposition_id == 88
+        assert dataset.ds_meta_data.dataset_doi == "10.5281/zenodo.88"
+        create_metadata = requests_mock.post.call_args_list[0].kwargs["json"]["metadata"]
+        assert create_metadata["keywords"] == ["rock", "spotify", "songhub"]
 
 
 # --------------------------------------------------------------------------

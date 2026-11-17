@@ -40,6 +40,11 @@
                                     <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}">
                                         <i data-feather="download"></i>
                                     </a>
+                                    {% if dataset.dataset_type == "song" %}
+                                        <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=dataset.id) }}" title="Edit song dataset">
+                                            <i data-feather="edit"></i>
+                                        </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -104,6 +109,11 @@
                                             <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}">
                                                 <i data-feather="download"></i>
                                             </a>
+                                            {% if local_dataset.dataset_type == "song" %}
+                                                <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=local_dataset.id) }}" title="Edit song dataset">
+                                                    <i data-feather="edit"></i>
+                                                </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}

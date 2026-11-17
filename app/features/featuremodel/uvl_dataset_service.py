@@ -24,43 +24,41 @@ class UVLDatasetService:
             "affiliation": current_user.profile.affiliation,
             "orcid": current_user.profile.orcid,
         }
-        dsmetadata = DSMetaDataRepository().create(**form.get_dsmetadata())
-        for author_data in [main_author] + form.get_authors():
-            author = self.author_repository.create(
-                commit=False, ds_meta_data_id=dsmetadata.id, **author_data
-            )
-            dsmetadata.authors.append(author)
-        dataset = UVLDataset(user_id=current_user.id, ds_meta_data_id=dsmetadata.id)
-        self.repository.session.add(dataset)
-        self.repository.session.flush()
-        for feature_model in form.feature_models:
-            filename = feature_model.uvl_filename.data
-            metadata = self.fmmetadata_repository.create(
-                commit=False, **feature_model.get_fmmetadata()
-            )
-            for author_data in feature_model.get_authors():
-                metadata.authors.append(
-                    self.author_repository.create(
-                        commit=False, fm_meta_data_id=metadata.id, **author_data
+        try:
+            dsmetadata = DSMetaDataRepository().create(commit=False, **form.get_dsmetadata())
+            for author_data in [main_author] + form.get_authors():
+                author = self.author_repository.create(commit=False, ds_meta_data_id=dsmetadata.id, **author_data)
+                dsmetadata.authors.append(author)
+            dataset = UVLDataset(user_id=current_user.id, ds_meta_data=dsmetadata)
+            self.repository.session.add(dataset)
+            self.repository.session.flush()
+            for feature_model in form.feature_models:
+                filename = feature_model.uvl_filename.data
+                metadata = self.fmmetadata_repository.create(commit=False, **feature_model.get_fmmetadata())
+                for author_data in feature_model.get_authors():
+                    metadata.authors.append(
+                        self.author_repository.create(commit=False, fm_meta_data_id=metadata.id, **author_data)
+                    )
+                model = self.feature_model_repository.create(
+                    commit=False, data_set_id=dataset.id, fm_meta_data_id=metadata.id
+                )
+                source = os.path.join(current_user.temp_folder(), filename)
+                with open(source, "rb") as stream:
+                    checksum = hashlib.md5(stream.read()).hexdigest()
+                model.files.append(
+                    self.hubfilerepository.create(
+                        commit=False,
+                        name=filename,
+                        checksum=checksum,
+                        size=os.path.getsize(source),
+                        feature_model_id=model.id,
                     )
                 )
-            model = self.feature_model_repository.create(
-                commit=False, data_set_id=dataset.id, fm_meta_data_id=metadata.id
-            )
-            source = os.path.join(current_user.temp_folder(), filename)
-            with open(source, "rb") as stream:
-                checksum = hashlib.md5(stream.read()).hexdigest()
-            model.files.append(
-                self.hubfilerepository.create(
-                    commit=False,
-                    name=filename,
-                    checksum=checksum,
-                    size=os.path.getsize(source),
-                    feature_model_id=model.id,
-                )
-            )
-        self.repository.session.commit()
-        return dataset
+            self.repository.session.commit()
+            return dataset
+        except Exception:
+            self.repository.session.rollback()
+            raise
 
     def move_files(self, dataset: UVLDataset, current_user) -> None:
         destination = os.path.join(

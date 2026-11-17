@@ -363,32 +363,6 @@
                                                         <label class="form-label">Title</label>
                                                         <input type="text" class="form-control" name="feature_models-${formUniqueId}-title">
                                                     </div>
-
-                                                    <h1 class="h3 mb-3 mt-4">SongHub CSV dataset</h1>
-                                                    <form action="{{ url_for('dataset.upload') }}" class="dropzone" id="songDropzone">
-                                                        <div id="song-dropzone-text">Drop a Spotify/YouTube CSV here</div>
-                                                    </form>
-                                                    <span class="text-danger" id="song-alerts" style="display: none"></span>
-                                                    <script>
-                                                        Dropzone.options.songDropzone = {
-                                                            url: "/dataset/file/upload",
-                                                            paramName: "file",
-                                                            maxFiles: 1,
-                                                            maxFilesize: 50,
-                                                            acceptedFiles: ".csv,text/csv",
-                                                            init: function () {
-                                                                this.on("success", function (file, response) {
-                                                                    document.getElementById("song_filename").value = response.filename;
-                                                                    document.getElementById("upload_dataset").style.display = "block";
-                                                                });
-                                                                this.on("error", function (file, message) {
-                                                                    const alert = document.getElementById("song-alerts");
-                                                                    alert.textContent = typeof message === "string" ? message : "Invalid song CSV";
-                                                                    alert.style.display = "block";
-                                                                });
-                                                            }
-                                                        };
-                                                    </script>
                                                 </div>
                                                 <div class="col-12">
                                                     <div class="mb-3">
@@ -472,6 +446,48 @@
 
                 </script>
 
+            </div>
+
+            <div class="mt-4" style="padding-left: 2rem">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h2 class="h3 mb-0">SongHub CSV dataset</h2>
+                    <a href="{{ url_for('songdataset.upload_page') }}" class="btn btn-outline-primary btn-sm">
+                        Dedicated Song uploader
+                    </a>
+                </div>
+                <form action="{{ url_for('dataset.upload') }}" class="dropzone" id="songDropzone">
+                    <div id="song-dropzone-text">Drop a Spotify/YouTube CSV here</div>
+                </form>
+                <span class="text-danger" id="song-alerts" style="display: none"></span>
+                <div class="text-success mt-2" id="song-selected-file" style="display: none"></div>
+                <script>
+                    Dropzone.options.songDropzone = {
+                        url: "/dataset/file/upload",
+                        paramName: "file",
+                        maxFiles: 1,
+                        maxFilesize: 50,
+                        acceptedFiles: ".csv,text/csv",
+                        init: function () {
+                            this.on("success", function (file, response) {
+                                const songAlerts = document.getElementById("song-alerts");
+                                const songSelected = document.getElementById("song-selected-file");
+                                songAlerts.style.display = "none";
+                                songAlerts.textContent = "";
+                                document.getElementById("song_filename").value = response.filename;
+                                songSelected.textContent = "Validated CSV ready: " + response.filename;
+                                songSelected.style.display = "block";
+                                show_upload_dataset();
+                            });
+                            this.on("error", function (file, message) {
+                                const alert = document.getElementById("song-alerts");
+                                alert.textContent = typeof message === "string"
+                                    ? message
+                                    : (message && message.message) || "Invalid song CSV";
+                                alert.style.display = "block";
+                            });
+                        }
+                    };
+                </script>
             </div>
         </div>
 

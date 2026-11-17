@@ -1,8 +1,8 @@
+import os
 from datetime import datetime
 from enum import Enum
-import os
 
-from flask import request
+from flask import has_request_context, request
 from sqlalchemy import Enum as SQLAlchemyEnum
 
 from app import db
@@ -71,13 +71,12 @@ class BaseDataset(db.Model):
     __tablename__ = "data_set"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    dataset_type = db.Column(db.String(32), nullable=False, default="base", index=True)
+    dataset_type = db.Column(db.String(32), nullable=False, default="uvl", index=True)
 
     ds_meta_data_id = db.Column(db.Integer, db.ForeignKey("ds_meta_data.id"), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     ds_meta_data = db.relationship("DSMetaData", backref=db.backref("data_set", uselist=False))
-    feature_models = db.relationship("FeatureModel", backref="data_set", lazy=True, cascade="all, delete")
 
     __mapper_args__ = {
         "polymorphic_on": dataset_type,
@@ -88,7 +87,7 @@ class BaseDataset(db.Model):
         return self.ds_meta_data.title
 
     def files(self):
-        return [file for fm in self.feature_models for file in fm.files]
+        return []
 
     def delete(self):
         db.session.delete(self)
@@ -105,10 +104,10 @@ class BaseDataset(db.Model):
         return None
 
     def get_files_count(self):
-        return sum(len(fm.files) for fm in self.feature_models)
+        return len(self.files())
 
     def get_file_total_size(self):
-        return sum(file.size for fm in self.feature_models for file in fm.files)
+        return sum(file.size for file in self.files())
 
     def get_file_total_size_for_human(self):
         from app.features.dataset.services import SizeService
@@ -121,7 +120,8 @@ class BaseDataset(db.Model):
         return DataSetService().get_uvlhub_doi(self)
 
     def to_dict(self):
-        result = {
+        base_url = request.host_url.rstrip("/") if has_request_context() else ""
+        return {
             "title": self.ds_meta_data.title,
             "id": self.id,
             "created_at": self.created_at,
@@ -133,7 +133,7 @@ class BaseDataset(db.Model):
             "dataset_doi": self.ds_meta_data.dataset_doi,
             "tags": self.ds_meta_data.tags.split(",") if self.ds_meta_data.tags else [],
             "url": self.get_uvlhub_doi(),
-            "download": f'{request.host_url.rstrip("/")}/dataset/download/{self.id}',
+            "download": f"{base_url}/dataset/download/{self.id}",
             "zenodo": self.get_zenodo_url(),
             "dataset_type": self.dataset_type,
             "files": [file.to_dict() for file in self.files()],
@@ -141,28 +141,30 @@ class BaseDataset(db.Model):
             "total_size_in_bytes": self.get_file_total_size(),
             "total_size_in_human_format": self.get_file_total_size_for_human(),
         }
-        if self.dataset_type == "song":
-            result["song_metrics"] = {
-                "number_of_songs": self.song_metrics.number_of_songs,
-                "number_of_artists": self.song_metrics.number_of_artists,
-                "average_streams": self.song_metrics.average_streams,
-                "average_views": self.song_metrics.average_views,
-                "average_likes": self.song_metrics.average_likes,
-            }
-        return result
 
     def __repr__(self):
         return f"BaseDataset<{self.id}>"
-
-
-# Compatibility name retained for existing UVL callers and integrations.
-DataSet = BaseDataset
 
 
 class UVLDataset(BaseDataset):
     """UVL dataset specialization kept compatible with the legacy model."""
 
     __mapper_args__ = {"polymorphic_identity": "uvl"}
+
+    feature_models = db.relationship("FeatureModel", backref="data_set", lazy=True, cascade="all, delete")
+
+    def files(self):
+        return [file for fm in self.feature_models for file in fm.files]
+
+    def get_files_count(self):
+        return sum(len(fm.files) for fm in self.feature_models)
+
+    def get_file_total_size(self):
+        return sum(file.size for fm in self.feature_models for file in fm.files)
+
+
+# Compatibility name retained for existing UVL callers and integrations.
+DataSet = UVLDataset
 
 
 class DSDownloadRecord(db.Model):
