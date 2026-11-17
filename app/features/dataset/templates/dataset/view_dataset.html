@@ -156,6 +156,25 @@
                 </div>
                 {% endif %}
 
+                {% if dataset.communities is defined and dataset.communities %}
+                <div class="row mb-2">
+
+                    <div class="col-md-4 col-12">
+                        <span class="text-secondary">
+                            Communities
+                        </span>
+                    </div>
+                    <div class="col-md-8 col-12">
+                        {% for comm in dataset.communities %}
+                        <a href="{{ url_for('community.detail', community_id=comm.id) }}" class="badge bg-primary text-decoration-none me-1">
+                            {{ comm.name }}
+                        </a>
+                        {% endfor %}
+                    </div>
+
+                </div>
+                {% endif %}
+
                 
 
             </div>
