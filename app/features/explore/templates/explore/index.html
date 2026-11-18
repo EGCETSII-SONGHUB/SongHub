@@ -37,7 +37,7 @@
 
         <div class="col-lg-5 fixed-column" id="filters">
 
-            {{ form.hidden_tag() }}
+            {% if form.csrf_token %}{{ form.hidden_tag() }}{% else %}<input type="hidden" id="csrf_token" name="csrf_token" value="">{% endif %}
 
             <div class="row">
 
@@ -48,10 +48,21 @@
                         <div class="col-12">
                             <div class="mb-3">
                                 <label class="form-label" for="query">
-                                    Search for datasets by title, description, authors, tags, UVL files...
+                                    Search for datasets by title, description, authors, tags, UVL or song files...
                                 </label>
                                 <input class="form-control" id="query" name="query" required="" type="text"
                                        value="" autofocus>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="dataset_type">Dataset type</label>
+                                <select class="form-control" id="dataset_type" name="dataset_type">
+                                    <option value="any">Any</option>
+                                    <option value="uvl">UVL</option>
+                                    <option value="song">Song</option>
+                                </select>
                             </div>
                         </div>
 

@@ -1,7 +1,15 @@
 from splent_framework.services.BaseService import BaseService
 
 from app.features.featuremodel.repositories import FeatureModelRepository, FMMetaDataRepository
+from app.features.featuremodel.uvl_dataset_service import UVLDatasetService
 from app.features.hubfile.services import HubfileService
+
+
+class UVLUploadService:
+    """UVL-only temporary upload handling kept outside common dataset routes."""
+
+    def save_temp_uvl(self, file, current_user) -> dict:
+        return UVLDatasetService().save_temp_uvl(file, current_user)
 
 
 class FeatureModelService(BaseService):

@@ -97,6 +97,13 @@ chico sundermann">
                         </a>
                     </li>
 
+                    <li class="sidebar-item {{ 'active' if request.endpoint == 'songdataset.upload_page' else '' }}">
+                        <a class="sidebar-link" href="{{ url_for('songdataset.upload_page') }}">
+                            <i class="align-middle" data-feather="music"></i> <span
+                                class="align-middle">Upload song dataset</span>
+                        </a>
+                    </li>
+
                     <li class="sidebar-item {{ 'active' if request.endpoint == 'dataset.list_dataset' else '' }}">
                         <a class="sidebar-link" href="{{ url_for('dataset.list_dataset') }}">
                             <i class="align-middle" data-feather="list"></i> <span

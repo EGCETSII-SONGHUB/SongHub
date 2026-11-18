@@ -26,12 +26,127 @@
             Explore more datasets
         </a>
     </div>
+    {% if dataset.dataset_type == "song" and current_user.is_authenticated and current_user.id == dataset.user_id %}
+    <div class="col-6 text-end">
+        <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=dataset.id) }}"
+           class="btn btn-outline-secondary btn-sm" id="edit-song-dataset" style="border-radius: 5px;">
+            <i data-feather="edit" class="center-button-icon"></i>
+            Edit song dataset
+        </a>
+    </div>
+    {% endif %}
 
 </div>
 
 <div class="row">
 
     <div class="col-xl-8 col-lg-12 col-md-12 col-sm-12">
+
+        {% if dataset.dataset_type == "song" %}
+        <div class="card">
+            <div class="card-body">
+                <h3>Song statistics</h3>
+                <div id="song-summary" class="row mb-3"></div>
+                <input id="song-filter" class="form-control mb-3" placeholder="Filter artist, track, album or channel">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="song-table">
+                        <thead><tr><th>Artist</th><th>Track</th><th>Album</th><th>Streams</th><th>Views</th><th>Likes</th><th>Danceability</th><th>Energy</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted" id="song-page-info"></small>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="song-prev" disabled>Previous</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="song-next" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (() => {
+                const baseUrl = "{{ url_for('songdataset.preview_dataset', dataset_id=dataset.id) }}";
+                const limit = 25;
+                let offset = 0;
+                let controller = null;
+                let summaryRendered = false;
+
+                const formatInt = (val) => Math.round(Number(val || 0)).toLocaleString();
+                const formatAvg = (val) => Number(val || 0).toLocaleString(undefined, {maximumFractionDigits: 2});
+
+                const renderSummary = (summaryData) => {
+                    if (summaryRendered) return;
+                    summaryRendered = true;
+                    const summary = document.getElementById("song-summary");
+                    const items = [
+                        ["Songs", formatInt(summaryData.number_of_songs)],
+                        ["Artists", formatInt(summaryData.number_of_artists)],
+                        ["Avg. Streams", formatAvg(summaryData.average_streams ?? summaryData.average_stream)],
+                        ["Avg. Views", formatAvg(summaryData.average_views)],
+                        ["Avg. Likes", formatAvg(summaryData.average_likes)],
+                    ];
+                    summary.replaceChildren();
+                    items.forEach(([label, value]) => {
+                        const col = document.createElement("div");
+                        col.className = "col-md-4 col-6 mb-2";
+                        col.innerHTML = `<strong class="text-muted d-block">${label}</strong><span>${value}</span>`;
+                        summary.appendChild(col);
+                    });
+                };
+
+                const loadPage = () => {
+                    const q = document.getElementById("song-filter").value.trim();
+                    if (controller) controller.abort();
+                    controller = new AbortController();
+
+                    fetch(`${baseUrl}?limit=${limit}&offset=${offset}&q=${encodeURIComponent(q)}`, {
+                        signal: controller.signal,
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            renderSummary(data.summary || {});
+                            const body = document.querySelector("#song-table tbody");
+                            const fields = ["Artist", "Track", "Album", "Stream", "Views", "Likes", "Danceability", "Energy"];
+                            body.replaceChildren();
+                            (data.rows || []).forEach(row => {
+                                const tr = document.createElement("tr");
+                                fields.forEach(field => {
+                                    const cell = document.createElement("td");
+                                    cell.textContent = row[field] || "";
+                                    tr.appendChild(cell);
+                                });
+                                body.appendChild(tr);
+                            });
+
+                            const total = data.total ?? (data.rows || []).length;
+                            const start = total === 0 ? 0 : offset + 1;
+                            const end = Math.min(offset + (data.rows || []).length, total);
+                            document.getElementById("song-page-info").textContent =
+                                `Showing ${start}-${end} of ${total} tracks`;
+                            document.getElementById("song-prev").disabled = offset <= 0;
+                            document.getElementById("song-next").disabled = offset + limit >= total;
+                        })
+                        .catch(err => {
+                            if (err.name !== "AbortError") throw err;
+                        });
+                };
+
+                document.getElementById("song-filter").addEventListener("input", () => {
+                    offset = 0;
+                    loadPage();
+                });
+                document.getElementById("song-prev").addEventListener("click", () => {
+                    offset = Math.max(0, offset - limit);
+                    loadPage();
+                });
+                document.getElementById("song-next").addEventListener("click", () => {
+                    offset += limit;
+                    loadPage();
+                });
+                loadPage();
+            })();
+        </script>
+        {% endif %}
 
         <div class="card">
             <div class="card-body">
@@ -89,8 +204,6 @@
                         </p>
                         {% endfor %}
                     </div>
-
-
                 </div>
 
                 {% if dataset.ds_meta_data.publication_doi %}
@@ -131,7 +244,7 @@
                             </div>
                         {% else %}
                             <div class="col-md-8 col-12">
-                                <a href="https://zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}" target="_blank">
+                                <a href="https://sandbox.zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}" target="_blank">
                                     https://sandbox.zenodo.org/records/{{ dataset.ds_meta_data.deposition_id }}
                                 </a>
                             </div>
@@ -186,6 +299,7 @@
 
         </div>
 
+        {% if dataset.dataset_type != "song" %}
         <div class="card">
 
             <div class="card-body">
@@ -227,6 +341,7 @@
             </div>
 
         </div>
+        {% endif %}
 
 
     </div>
@@ -239,7 +354,7 @@
 
                 <div class="row">
                     <div class="col-12 d-flex justify-content-between align-items-center">
-                        <h4 style="margin-bottom: 0px">UVL models</h4>
+                        <h4 style="margin-bottom: 0px">{{ "Song files" if dataset.dataset_type == "song" else "UVL models" }}</h4>
                         <h4 style="margin-bottom: 0px;"><span class="badge bg-dark">{{ dataset.get_files_count() }}</span></h4>
                     </div>
                 </div>
@@ -248,6 +363,14 @@
             </div>
             
 
+            {% if dataset.dataset_type == "song" %}
+            {% for file in dataset.song_files %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <span><i data-feather="file-text"></i> {{ file.name }}<br><small class="text-muted">({{ file.get_formatted_size() }})</small></span>
+                        <a class="btn btn-primary btn-sm" href="{{ url_for('songdataset.download_song_file', file_id=file.id) }}">Download</a>
+                    </div>
+            {% endfor %}
+            {% else %}
             {% for feature_model in dataset.feature_models %}
                 {% for file in feature_model.files %}
                     <div class="list-group-item">
@@ -324,6 +447,7 @@
                     </div>
                 {% endfor %}
             {% endfor %}
+                {% endif %}
         </div>
         
         
@@ -336,6 +460,7 @@
     
 </div>
 
+{% if dataset.dataset_type != "song" %}
 <!-- Modal-->
 <div class="modal fade" id="fileViewerModal" tabindex="-1" aria-labelledby="fileViewerModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" style="height: 80vh; display: flex; align-items: center;">
@@ -363,14 +488,16 @@
 </div>
 
 <script type="text/javascript" src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
-
-
+{% endif %}
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         feather.replace();
     });
+</script>
 
+{% if dataset.dataset_type != "song" %}
+<script>
     var currentFileId;
 
     function viewFile(fileId) {
@@ -495,5 +622,6 @@
         });
     }
 </script>
+{% endif %}
 
 {% endblock %}

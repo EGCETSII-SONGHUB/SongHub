@@ -1,5 +1,6 @@
 """Repository-level tests for explore — the dataset search query against the DB."""
 
+import json
 from datetime import datetime
 
 import pytest
@@ -9,6 +10,8 @@ from app.features.auth.models import User
 from app.features.dataset.models import Author, DataSet, DSMetaData, PublicationType
 from app.features.explore.repositories import ExploreRepository
 from app.features.featuremodel.models import FeatureModel, FMMetaData
+from app.features.songdataset.models import SongDataset, SongFile, SongMetadata, SongMetrics
+from app.features.songdataset.validation import EXPECTED_COLUMNS
 
 pytestmark = pytest.mark.repository
 
@@ -201,3 +204,57 @@ def test_tags_combine_with_the_query(test_app, clean_database):
         # "home" alone matches two datasets; the tag narrows them to one.
         assert _titles(repository.filter("home")) == ["Home Banking", "Smart Home"]
         assert _titles(repository.filter("home", tags=["iot"])) == ["Smart Home"]
+
+
+def _make_song_dataset(tmp_path, title, artist, track, tags="music", doi="10.1234/song-explore"):
+    ds_meta = DSMetaData(
+        title=title,
+        description=f"Songs by {artist}",
+        publication_type=PublicationType.NONE,
+        dataset_doi=doi,
+        tags=tags,
+    )
+    db.session.add(ds_meta)
+    db.session.flush()
+    db.session.add(Author(name="Music Curator", affiliation="SongHub", ds_meta_data_id=ds_meta.id))
+    metrics = SongMetrics(number_of_songs=1, number_of_artists=1, average_streams=1000.0)
+    song_meta = SongMetadata(csv_filename="tracks.csv", columns=json.dumps(EXPECTED_COLUMNS), song_metrics=metrics)
+    dataset = SongDataset(
+        user_id=_owner().id,
+        dataset_type="song",
+        ds_meta_data=ds_meta,
+        song_metadata=song_meta,
+        created_at=datetime(2024, 4, 1),
+    )
+    dataset.song_files.append(SongFile(name="tracks.csv", checksum="abc", size=100))
+    db.session.add(dataset)
+    db.session.commit()
+
+    csv_dir = tmp_path / "uploads" / f"user_{dataset.user_id}" / f"dataset_{dataset.id}"
+    csv_dir.mkdir(parents=True, exist_ok=True)
+    header = ",".join(EXPECTED_COLUMNS)
+    row = (
+        f"sp,yt,{artist},{track},Album,album,0.7,0.8,5,-5,0.1,0.1,0,0.1,0.5,120,200000,"
+        "1000,2000,100,10,True,True,Channel,Title,Desc"
+    )
+    (csv_dir / "tracks.csv").write_text(f"{header}\n{row}\n", encoding="utf-8")
+    return dataset
+
+
+def test_explore_supports_song_datasets_and_type_filtering(test_app, clean_database, tmp_path, monkeypatch):
+    monkeypatch.setenv("WORKING_DIR", str(tmp_path))
+    with test_app.app_context():
+        _seed_corpus()
+        _make_song_dataset(tmp_path, title="Indie Vibes", artist="Gorillaz", track="Feel Good Inc.", tags="rock")
+
+        repository = ExploreRepository()
+        assert _titles(repository.filter("", dataset_type="song")) == ["Indie Vibes"]
+        assert _titles(repository.filter("", dataset_type="uvl")) == [
+            "Home Banking",
+            "Car Configurator",
+            "Smart Home",
+        ]
+        assert _titles(repository.filter("Gorillaz", dataset_type="any")) == ["Indie Vibes"]
+        assert _titles(repository.filter("Gorillaz", dataset_type="song")) == ["Indie Vibes"]
+        assert _titles(repository.filter("Curator", dataset_type="song")) == ["Indie Vibes"]
+        assert _titles(repository.filter("Gorillaz", dataset_type="uvl")) == []

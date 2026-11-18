@@ -1,7 +1,7 @@
 [project]
 name = "uvlhub"
 version = "1.0.0"
-description = "UVLHub — Flask product built on splent_framework."
+description = "SongHub — extensible dataset platform for UVL and musical data."
 readme = "README.md"
 requires-python = ">=3.13"
 
@@ -9,6 +9,7 @@ requires-python = ">=3.13"
 features = [
     "auth",
     "dataset",
+    "songdataset",
     "explore",
     "featuremodel",
     "flamapy",
