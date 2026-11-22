@@ -5,6 +5,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
 
+class Role: 
+    ADMIN = "admin"
+    CURATOR = "curator"
+    USER = "user"
+    ALL = (ADMIN, CURATOR, USER)
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -15,11 +20,20 @@ class User(db.Model, UserMixin):
 
     data_sets = db.relationship("BaseDataset", backref="user", lazy=True)
     profile = db.relationship("UserProfile", backref="user", uselist=False)
+    role = db.Column(db.String(20), nullable=False, default=Role.USER, server_default=Role.USER)
 
     def __init__(self, **kwargs):
+        kwargs.setdefault("role", Role.USER)
         super(User, self).__init__(**kwargs)
         if "password" in kwargs:
             self.set_password(kwargs["password"])
+
+    @property
+    def is_admin(self) -> bool: 
+        return self.role == Role.ADMIN
+
+    def has_role(self, *roles: str) -> bool: 
+        return self.role == Role.ADMIN or self.role in roles
 
     def __repr__(self):
         return f"<User {self.email}>"
@@ -34,3 +48,4 @@ class User(db.Model, UserMixin):
         from app.features.auth.services import AuthenticationService
 
         return AuthenticationService().temp_folder_by_user(self)
+
