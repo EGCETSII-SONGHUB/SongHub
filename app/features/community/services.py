@@ -9,8 +9,8 @@ from werkzeug.utils import secure_filename
 
 from app.features.auth.models import User
 from app.features.auth.repositories import UserRepository
-from app.features.community.models import Community
-from app.features.community.repositories import CommunityRepository
+from app.features.community.models import Community, CommunityDatasetRequest
+from app.features.community.repositories import CommunityDatasetRequestRepository, CommunityRepository
 from app.features.dataset.models import DataSet
 from app.features.dataset.repositories import DataSetRepository
 
@@ -47,6 +47,7 @@ class CommunityService(BaseService):
         super().__init__(CommunityRepository())
         self.dataset_repository = DataSetRepository()
         self.user_repository = UserRepository()
+        self.request_repository = CommunityDatasetRequestRepository()
 
     def logos_directory(self) -> str:
         """Return the directory where uploaded community logos are stored."""
@@ -170,18 +171,48 @@ class CommunityService(BaseService):
 
         return community, None
 
-    def add_dataset(self, community: Community, dataset_id: int, user) -> DataSet:
-        """Attach *dataset_id* to *community*; only the dataset owner may add it."""
+    def propose_dataset(self, community: Community, dataset_id: int, user) -> CommunityDatasetRequest:
+        """Create a pending request to add one of the user's dataset to the community"""
         dataset = self.dataset_repository.get_by_id(dataset_id)
         if dataset is None:
             raise LookupError("Dataset not found.")
         if dataset.user_id != user.id:
-            raise PermissionError("Only the owner of a dataset can add it to a community.")
+            raise PermissionError("Only the owner of a dataset can propose it to a community.")
+        if dataset in community.datasets:
+            raise ValueError("This dataset is already in the community.")
+        if self.request_repository.get_pending(community.id, dataset.id):
+            raise ValueError("There is already a pending request for this dataset.")
 
-        if dataset not in community.datasets:
-            community.datasets.append(dataset)
-            self.repository.session.commit()
-        return dataset
+        request = CommunityDatasetRequest(community_id=community.id, dataset_id=dataset.id, requester_id=user.id)
+        self.repository.session.add(request)
+        self.repository.session.commit()
+        return request
+
+    def _resolve_request(self, request: CommunityDatasetRequest, curator, status: str, comment: str | None):
+        if not request.community.is_curator(curator):
+            raise PermissionError("Only curators can resolve requests.")
+        if not request.is_pending():
+            raise ValueError("This request has already been resolved.")
+
+        request.resolve(status, curator, comment)
+        if status == CommunityDatasetRequest.STATUS_ACCEPTED and request.dataset not in request.community.datasets:
+            request.community.datasets.append(request.dataset)
+        self.repository.session.commit()
+        return request
+
+    def accept_request(self, request, curator, comment: str | None = None):
+        return self._resolve_request(request, curator, CommunityDatasetRequest.STATUS_ACCEPTED, comment)
+
+    def reject_request(self, request, curator, comment: str | None = None):
+        return self._resolve_request(request, curator, CommunityDatasetRequest.STATUS_REJECTED, comment)
+
+    def list_pending_requests(self, community: Community, curator) -> list[CommunityDatasetRequest]:
+        if not community.is_curator(curator):
+            raise PermissionError("Only curators can see pending requests.")
+        return self.request_repository.get_pending_by_community(community.id)
+
+    def list_user_requests(self, user) -> list[CommunityDatasetRequest]:
+        return self.request_repository.get_by_requester(user.id)
 
     def remove_dataset(self, community: Community, dataset_id: int, user) -> None:
         """Remove *dataset_id* from *community* if *user* owns the dataset or curates the community."""
@@ -237,5 +268,6 @@ class CommunityService(BaseService):
     def get_available_datasets_for_user(self, community: Community, user_id: int) -> list[DataSet]:
         """Return *user_id*'s datasets not yet linked to *community*, newest first."""
         linked_ids = {dataset.id for dataset in community.datasets}
+        linked_ids |= {r.dataset_id for r in self.request_repository.get_pending_by_community(community.id)}
         user_datasets = DataSet.query.filter_by(user_id=user_id).order_by(DataSet.created_at.desc()).all()
         return [dataset for dataset in user_datasets if dataset.id not in linked_ids]

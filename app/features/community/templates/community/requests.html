@@ -1,0 +1,73 @@
+{% extends "base_template.html" %}
+
+{% block title %}Pending requests - {{ community.name }}{% endblock %}
+
+{% block content %}
+
+    <div class="mb-3">
+        <a href="{{ url_for('community.detail', community_id=community.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i data-feather="arrow-left" class="center-button-icon"></i>
+            Back to {{ community.name }}
+        </a>
+    </div>
+
+    <h1 class="h3 mb-3"><b>Pending requests</b></h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }}" role="alert">
+                    <div class="alert-message">
+                        <p class="mb-0">{{ message }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if requests %}
+        {% for req in requests %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h2 class="h5 mb-1">
+                        {% if req.dataset.ds_meta_data.dataset_doi %}
+                            <a href="{{ url_for('dataset.subdomain_index', doi=req.dataset.ds_meta_data.dataset_doi) }}">
+                                {{ req.dataset.ds_meta_data.title }}
+                            </a>
+                        {% else %}
+                            {{ req.dataset.ds_meta_data.title }}
+                        {% endif %}
+                    </h2>
+                    <p class="text-secondary small mb-2">
+                        Proposed by {{ req.requester.email }}
+                        on {{ req.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                    </p>
+                    <p class="card-text">{{ req.dataset.ds_meta_data.description }}</p>
+
+                    <form method="POST">
+                        {{ review_form.hidden_tag() }}
+                        <div class="mb-3">
+                            <label for="comment-{{ req.id }}" class="form-label">Comment (optional)</label>
+                            <textarea name="comment" id="comment-{{ req.id }}" class="form-control" rows="2" maxlength="1000"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-sm"
+                                formaction="{{ url_for('community.accept_request', community_id=community.id, request_id=req.id) }}">
+                            Accept
+                        </button>
+                        <button type="submit" class="btn btn-danger btn-sm"
+                                formaction="{{ url_for('community.reject_request', community_id=community.id, request_id=req.id) }}">
+                            Reject
+                        </button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="card-text text-secondary mb-0">There are no pending requests.</p>
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}
