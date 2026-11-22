@@ -1,0 +1,41 @@
+{% extends "base_template.html" %}
+
+{% block title %}Manage users{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-3">Manage users</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="alert alert-{{ category }}" role="alert"><div class="alert-message">{{ message }}</div></div>
+  {% endfor %}
+{% endwith %}
+
+<div class="card shadow-sm">
+  <div class="card-body table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Email</th><th>Name</th><th>Role</th><th></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.email }}</td>
+          <td>{{ u.profile.name if u.profile else '' }} {{ u.profile.surname if u.profile else '' }}</td>
+          <td><span class="badge bg-secondary">{{ u.role }}</span></td>
+          <td>
+            <form method="POST" action="{{ url_for('admin.change_user_role', user_id=u.id) }}" class="d-flex gap-2">
+              {{ form.hidden_tag() }}
+              <select name="role" class="form-select form-select-sm" aria-label="Role for {{ u.email }}">
+                {% for value, label in form.role.choices %}
+                  <option value="{{ value }}" {{ 'selected' if value == u.role else '' }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-primary">Save</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
