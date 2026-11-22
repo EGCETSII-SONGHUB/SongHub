@@ -1,6 +1,6 @@
 from splent_framework.seeders.BaseSeeder import BaseSeeder
 
-from app.features.auth.models import User, Role
+from app.features.auth.models import Role, User
 from app.features.profile.models import UserProfile
 
 
@@ -24,7 +24,7 @@ class AuthSeeder(BaseSeeder):
         # Create profiles for each user inserted.
         user_profiles = []
         names = [("John", "Doe"), ("Jane", "Doe"), ("Ada", "Admin"), ("Carl", "Curator")]
-        
+
         for user, name in zip(seeded_users, names):
             profile_data = {
                 "user_id": user.id,

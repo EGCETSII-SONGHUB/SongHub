@@ -5,11 +5,13 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
 
-class Role: 
+
+class Role:
     ADMIN = "admin"
     CURATOR = "curator"
     USER = "user"
     ALL = (ADMIN, CURATOR, USER)
+
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,10 +31,10 @@ class User(db.Model, UserMixin):
             self.set_password(kwargs["password"])
 
     @property
-    def is_admin(self) -> bool: 
+    def is_admin(self) -> bool:
         return self.role == Role.ADMIN
 
-    def has_role(self, *roles: str) -> bool: 
+    def has_role(self, *roles: str) -> bool:
         return self.role == Role.ADMIN or self.role in roles
 
     def __repr__(self):
@@ -48,4 +50,3 @@ class User(db.Model, UserMixin):
         from app.features.auth.services import AuthenticationService
 
         return AuthenticationService().temp_folder_by_user(self)
-

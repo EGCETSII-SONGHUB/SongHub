@@ -1,10 +1,10 @@
 from flask import render_template
 
+from app.features.auth.decorators import role_required
+from app.features.auth.models import Role
 from app.features.zenodo import zenodo_bp
 from app.features.zenodo.services import ZenodoService
 
-from app.features.auth.decorators import role_required
-from app.features.auth.models import Role
 
 @zenodo_bp.route("/zenodo", methods=["GET"])
 def index():
