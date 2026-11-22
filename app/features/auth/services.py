@@ -4,7 +4,7 @@ from flask_login import current_user, login_user
 from splent_framework.configuration.configuration import uploads_folder_name
 from splent_framework.services.BaseService import BaseService
 
-from app.features.auth.models import User
+from app.features.auth.models import User, Role
 from app.features.auth.repositories import UserRepository
 from app.features.profile.models import UserProfile
 from app.features.profile.repositories import UserProfileRepository
@@ -69,3 +69,18 @@ class AuthenticationService(BaseService):
 
     def temp_folder_by_user(self, user: User) -> str:
         return os.path.join(uploads_folder_name(), "temp", str(user.id))
+
+    def list_users(self):
+        return self.repository.list_all()
+
+    def get_user(self, user_id: int):
+        return self.repository.get_user(user_id)
+
+    def change_role(self, user: User, role: str) -> User:
+        if role not in Role.ALL:
+            raise ValueError(f"Invalid role: {role}")
+        if user.role == Role.ADMIN and role != Role.ADMIN and self.repository.count_by_role(Role.ADMIN) <= 1:
+            raise ValueError("Cannot remove the last administrator.")
+        user.role = role
+        self.repository.session.commit()
+        return user

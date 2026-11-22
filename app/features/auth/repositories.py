@@ -20,3 +20,12 @@ class UserRepository(BaseRepository):
 
     def get_by_email(self, email: str):
         return self.model.query.filter_by(email=email).first()
+
+    def list_all(self):
+        return self.model.query.order_by(self.model.email).all()
+
+    def get_user(self, user_id: int):
+        return self.session.get(self.model, user_id)
+
+    def count_by_role(self, role: str) -> int:
+        return self.model.query.filter_by(role=role).count()
