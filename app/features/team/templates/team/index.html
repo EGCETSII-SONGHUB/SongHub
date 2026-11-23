@@ -4,65 +4,64 @@
 
 {% block content %}
 
-    <h1 class="h3 mb-3"><b>Team</b></h1>
+    <div class="mb-4">
+        <h1 class="h3 mb-1"><b>Team</b></h1>
+        <p class="text-muted small mb-0">Academic research groups and partner institutions collaborating on the platform.</p>
+    </div>
 
-
-    <div class="row row-cols-1 row-cols-lg-3 row-cols-md-2 row-cols-12 g-4">
+    <div class="row row-cols-1 row-cols-lg-3 row-cols-md-2 g-4">
 
         <div class="col">
-
-            <div class="card h-100">
+            <div class="card h-100 sh-card-interactive">
                 <img src="{{ url_for('static', filename='img/logos/university_of_seville.svg') }}"
                      class="card-img-top custom-img" alt="University of Seville">
                 <div class="card-body custom-card-body">
-                    <h5 class="card-title">University of Seville, Spain</h5>
-                    <p class="card-text">
+                    <h5 class="card-title fw-bold">University of Seville, Spain</h5>
+                    <p class="card-text text-muted">
                         Performs active development of the application and is responsible for code maintenance,
                         deployment, operation of services and new functionalities.
                     </p>
                 </div>
-                <div class="card-footer">
-                    <a href="http://www.us.es" target="_blank">www.us.es</a>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <a href="http://www.us.es" target="_blank" class="fw-medium text-decoration-none">www.us.es</a>
+                    <i data-feather="external-link" style="width: 14px; height: 14px;" class="text-muted"></i>
                 </div>
             </div>
-
         </div>
 
         <div class="col">
-
-            <div class="card h-100">
+            <div class="card h-100 sh-card-interactive">
                 <img src="{{ url_for('static', filename='img/logos/university_of_malaga.svg') }}"
                      class="card-img-top custom-img" alt="University of Malaga">
                 <div class="card-body custom-card-body">
-                    <h5 class="card-title">University of Malaga, Spain</h5>
-                    <p class="card-text">
+                    <h5 class="card-title fw-bold">University of Malaga, Spain</h5>
+                    <p class="card-text text-muted">
                         Responsible for active research, technical support
                     </p>
                 </div>
-                <div class="card-footer">
-                    <a href="http://www.uma.es" target="_blank">www.uma.es</a>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <a href="http://www.uma.es" target="_blank" class="fw-medium text-decoration-none">www.uma.es</a>
+                    <i data-feather="external-link" style="width: 14px; height: 14px;" class="text-muted"></i>
                 </div>
             </div>
-
         </div>
 
         <div class="col">
-
-            <div class="card h-100">
+            <div class="card h-100 sh-card-interactive">
                 <img src="{{ url_for('static', filename='img/logos/university_of_ulm.svg') }}"
                      class="card-img-top custom-img" alt="University of Ulm">
                 <div class="card-body custom-card-body">
-                    <h5 class="card-title">University of Ulm, Germany</h5>
-                    <p class="card-text">
+                    <h5 class="card-title fw-bold">University of Ulm, Germany</h5>
+                    <p class="card-text text-muted">
                         Provides population of consistent datasets with rich metadata for initial loading of models into
                         UVL. Responsible for the UVL parser. Active research.
                     </p>
                 </div>
-                <div class="card-footer">
-                    <a href="http://www.uni-ulm.de" target="_blank">www.uni-ulm.de</a>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <a href="http://www.uni-ulm.de" target="_blank" class="fw-medium text-decoration-none">www.uni-ulm.de</a>
+                    <i data-feather="external-link" style="width: 14px; height: 14px;" class="text-muted"></i>
                 </div>
             </div>
-
         </div>
 
     </div>

@@ -73,96 +73,89 @@ function send_query() {
                         document.getElementById("results_not_found").style.display = "none";
                     }
 
-
                     data.forEach(dataset => {
+                        const isSong = dataset.dataset_type === 'song';
+                        const domainBadge = isSong
+                            ? '<span class="badge sh-badge-song">Song</span>'
+                            : '<span class="badge sh-badge-uvl">UVL</span>';
                         let card = document.createElement('div');
                         card.className = 'col-12';
                         card.innerHTML = `
-                            <div class="card">
+                            <div class="card sh-card-interactive">
                                 <div class="card-body">
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <h3><a href="${dataset.url}">${dataset.title}</a></h3>
-                                        <div>
-                                            <span class="badge bg-secondary">${dataset.dataset_type === 'song' ? 'Song' : 'UVL'}</span>
-                                            <span class="badge bg-primary" style="cursor: pointer;" onclick="set_publication_type_as_query('${dataset.publication_type}')">${dataset.publication_type}</span>
+                                    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-1">
+                                        <h3 class="h4 mb-0"><a href="${dataset.url}" class="sh-card-title-link">${dataset.title}</a></h3>
+                                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                                            ${domainBadge}
+                                            <span class="badge sh-badge-pub" style="cursor: pointer;" onclick="set_publication_type_as_query('${dataset.publication_type}')">${dataset.publication_type}</span>
                                         </div>
                                     </div>
-                                    <p class="text-secondary">${formatDate(dataset.created_at)}</p>
+                                    <p class="text-secondary small mb-3">${formatDate(dataset.created_at)}</p>
 
                                     <div class="row mb-2">
-
-                                        <div class="col-md-4 col-12">
-                                            <span class=" text-secondary">
-                                                Description
-                                            </span>
+                                        <div class="col-md-3 col-12">
+                                            <span class="sh-meta-label">Description</span>
                                         </div>
-                                        <div class="col-md-8 col-12">
-                                            <p class="card-text">${dataset.description}</p>
+                                        <div class="col-md-9 col-12">
+                                            <p class="card-text mb-0">${dataset.description}</p>
                                         </div>
-
                                     </div>
 
                                     <div class="row mb-2">
-
-                                        <div class="col-md-4 col-12">
-                                            <span class=" text-secondary">
-                                                Authors
-                                            </span>
+                                        <div class="col-md-3 col-12">
+                                            <span class="sh-meta-label">Authors</span>
                                         </div>
-                                        <div class="col-md-8 col-12">
+                                        <div class="col-md-9 col-12">
                                             ${dataset.authors.map(author => `
-                                                <p class="p-0 m-0">${author.name}${author.affiliation ? ` (${author.affiliation})` : ''}${author.orcid ? ` (${author.orcid})` : ''}</p>
+                                                <p class="p-0 m-0 small">${author.name}${author.affiliation ? ` (${author.affiliation})` : ''}${author.orcid ? ` (${author.orcid})` : ''}</p>
                                             `).join('')}
                                         </div>
-
                                     </div>
 
+                                    ${dataset.tags && dataset.tags.length ? `
                                     <div class="row mb-2">
-
-                                        <div class="col-md-4 col-12">
-                                            <span class=" text-secondary">
-                                                Tags
-                                            </span>
+                                        <div class="col-md-3 col-12">
+                                            <span class="sh-meta-label">Tags</span>
                                         </div>
-                                        <div class="col-md-8 col-12">
-                                            ${dataset.tags.map(tag => `<span class="badge bg-primary me-1" style="cursor: pointer;" onclick="set_tag_as_query('${tag}')">${tag}</span>`).join('')}
-                                        </div>
-
-                                    </div>
-
-                                    ${dataset.song_metrics ? `
-                                    <div class="row mb-2 song-summary">
-                                        <div class="col-md-4 text-secondary">Music summary</div>
-                                        <div class="col-md-8">
-                                            ${dataset.song_metrics.number_of_songs} songs,
-                                            ${dataset.song_metrics.number_of_artists} artists,
-                                            avg. streams ${Number(dataset.song_metrics.average_streams || 0).toFixed(0)}
+                                        <div class="col-md-9 col-12 d-flex flex-wrap gap-1">
+                                            ${dataset.tags.map(tag => `<span class="badge sh-tag-pill" style="cursor: pointer;" onclick="set_tag_as_query('${tag}')">${tag}</span>`).join('')}
                                         </div>
                                     </div>` : ''}
 
-                                    <div class="row">
-
-                                        <div class="col-md-4 col-12">
-
+                                    ${dataset.song_metrics ? `
+                                    <div class="row mb-3 mt-2 song-summary">
+                                        <div class="col-md-3 col-12">
+                                            <span class="sh-meta-label">Music summary</span>
                                         </div>
-                                        <div class="col-md-8 col-12">
-                                            <a href="${dataset.url}" class="btn btn-outline-primary btn-sm" id="search" style="border-radius: 5px;">
-                                                View dataset
-                                            </a>
-                                            <a href="/dataset/download/${dataset.id}" class="btn btn-outline-primary btn-sm" id="search" style="border-radius: 5px;">
-                                                Download (${dataset.total_size_in_human_format})
-                                            </a>
+                                        <div class="col-md-9 col-12">
+                                            <div class="sh-song-mini-stats d-inline-flex flex-wrap gap-3">
+                                                <span>${dataset.song_metrics.number_of_songs} songs</span>
+                                                <span>${dataset.song_metrics.number_of_artists} artists</span>
+                                                <span>avg. streams ${Number(dataset.song_metrics.average_streams || 0).toFixed(0)}</span>
+                                            </div>
                                         </div>
+                                    </div>` : ''}
 
-
+                                    <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+                                        <a href="${dataset.url}" class="btn btn-outline-primary btn-sm">
+                                            <i data-feather="eye" class="center-button-icon"></i>
+                                            View dataset
+                                        </a>
+                                        <a href="/dataset/download/${dataset.id}" class="btn btn-outline-secondary btn-sm">
+                                            <i data-feather="download" class="center-button-icon"></i>
+                                            Download (${dataset.total_size_in_human_format})
+                                        </a>
                                     </div>
-
                                 </div>
                             </div>
                         `;
 
                         document.getElementById('results').appendChild(card);
                     });
+
+                    if (typeof feather !== 'undefined') {
+                        feather.replace();
+                    }
                 })
                 .catch(error => {
                     // Aborted requests are superseded queries, not failures.
@@ -209,7 +202,6 @@ function clearFilters() {
     // Reset the search query
     let queryInput = document.querySelector('#query');
     queryInput.value = "";
-    // queryInput.dispatchEvent(new Event('input', {bubbles: true}));
 
     // Reset the dataset type to its default value
     let datasetTypeSelect = document.querySelector('#dataset_type');
@@ -219,14 +211,12 @@ function clearFilters() {
 
     // Reset the publication type to its default value
     let publicationTypeSelect = document.querySelector('#publication_type');
-    publicationTypeSelect.value = "any"; // replace "any" with whatever your default value is
-    // publicationTypeSelect.dispatchEvent(new Event('input', {bubbles: true}));
+    publicationTypeSelect.value = "any";
 
     // Reset the sorting option
     let sortingOptions = document.querySelectorAll('[name="sorting"]');
     sortingOptions.forEach(option => {
-        option.checked = option.value == "newest"; // replace "default" with whatever your default value is
-        // option.dispatchEvent(new Event('input', {bubbles: true}));
+        option.checked = option.value == "newest";
     });
 
     // Perform a new search with the reset filters
