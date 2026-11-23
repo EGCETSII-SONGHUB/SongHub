@@ -1,6 +1,7 @@
 import json
 
 import pytest
+import sqlalchemy as sa
 
 from app import db
 from app.features.auth.models import User
@@ -69,3 +70,46 @@ def test_dataset_repository_coexists_polymorphically_with_uvl_and_song(test_app,
         assert {type(item) for item in items} == {SongDataset, UVLDataset}
         assert all(isinstance(item, BaseDataset) for item in items)
         assert {item.id for item in items} == {song.id, uvl.id}
+
+
+def test_orm_delete_and_orphan_removal_cascade_cleanly(test_app, clean_database):
+    with test_app.app_context():
+        owner = _make_user("orm-cascade@example.com")
+        dataset = _make_song_dataset(owner, title="Cascade ORM")
+        extra_file = SongFile(name="extra.csv", checksum="cafebabe", size=64)
+        dataset.song_files.append(extra_file)
+        db.session.commit()
+
+        extra_id = extra_file.id
+        dataset.song_files.remove(extra_file)
+        db.session.commit()
+        assert db.session.get(SongFile, extra_id) is None
+
+        dataset_id = dataset.id
+        file_id = dataset.song_files[0].id
+        meta_id = dataset.song_metadata_id
+        metrics_id = dataset.song_metadata.song_metrics_id
+
+        dataset.delete()
+
+        assert db.session.get(SongDataset, dataset_id) is None
+        assert db.session.get(BaseDataset, dataset_id) is None
+        assert db.session.get(SongFile, file_id) is None
+        assert db.session.get(SongMetadata, meta_id) is None
+        assert db.session.get(SongMetrics, metrics_id) is None
+
+
+def test_sql_delete_on_data_set_cascades_to_song_dataset_and_files(test_app, clean_database):
+    with test_app.app_context():
+        owner = _make_user("sql-cascade@example.com")
+        dataset = _make_song_dataset(owner, title="Cascade SQL")
+        dataset_id = dataset.id
+        file_id = dataset.song_files[0].id
+
+        db.session.execute(sa.text("DELETE FROM data_set WHERE id = :id"), {"id": dataset_id})
+        db.session.commit()
+        db.session.expire_all()
+
+        assert db.session.get(BaseDataset, dataset_id) is None
+        assert db.session.get(SongDataset, dataset_id) is None
+        assert db.session.get(SongFile, file_id) is None

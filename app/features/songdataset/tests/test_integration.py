@@ -284,3 +284,31 @@ def test_song_service_persists_metadata_metrics_and_file(test_app, clean_databas
         assert stored.song_metrics.number_of_songs == 1
         assert stored.song_metrics.number_of_artists == 1
         assert stored.song_files[0].name == "songs.csv"
+
+
+def test_html_upload_when_zenodo_fails_flashes_unsynchronized_notice_and_hides_from_explore(
+    test_client, tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("WORKING_DIR", str(tmp_path))
+    _signup_and_login(test_client, "html-draft@example.com")
+
+    with patch("app.features.zenodo.services.ZenodoService.synchronize_dataset", side_effect=RuntimeError("offline")):
+        response = test_client.post(
+            "/songdataset/upload",
+            data={
+                "title": "Local HTML Song",
+                "description": "Waiting for Zenodo",
+                "publication_type": "none",
+                "file": (io.BytesIO(_csv_bytes(ROCK_ROW)), "local.csv"),
+            },
+            headers={"Accept": "text/html"},
+            content_type="multipart/form-data",
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Unsynchronized datasets" in html
+    assert "appear publicly in Explore once synchronized" in html
+    assert test_client.post("/explore", json={"query": ""}).get_json() == []

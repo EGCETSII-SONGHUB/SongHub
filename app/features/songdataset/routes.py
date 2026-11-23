@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 
-from flask import abort, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -116,6 +116,12 @@ def create_dataset():
             zenodo_result = {"status": "pending"}
 
         if _wants_html():
+            if not dataset.ds_meta_data.dataset_doi:
+                flash(
+                    "Song dataset saved locally under Unsynchronized datasets. "
+                    "It will appear publicly in Explore once synchronized with Zenodo/Fakenodo.",
+                    "warning",
+                )
             return redirect(url_for("dataset.list_dataset"))
         return jsonify({"dataset_id": dataset.id, "synchronization": zenodo_result}), 201
     except Exception as exc:

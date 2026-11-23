@@ -40,13 +40,13 @@ def upgrade():
         sa.Column("csv_filename", sa.String(length=255), nullable=False),
         sa.Column("columns", sa.Text(), nullable=False),
         sa.Column("song_metrics_id", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(["song_metrics_id"], ["song_metrics.id"]),
+        sa.ForeignKeyConstraint(["song_metrics_id"], ["song_metrics.id"], ondelete="CASCADE"),
     )
     op.create_table(
         "song_dataset",
-        sa.Column("id", sa.Integer(), sa.ForeignKey("data_set.id"), primary_key=True),
+        sa.Column("id", sa.Integer(), sa.ForeignKey("data_set.id", ondelete="CASCADE"), primary_key=True),
         sa.Column("song_metadata_id", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(["song_metadata_id"], ["song_metadata.id"]),
+        sa.ForeignKeyConstraint(["song_metadata_id"], ["song_metadata.id"], ondelete="CASCADE"),
     )
     op.create_table(
         "song_file",
@@ -55,7 +55,7 @@ def upgrade():
         sa.Column("checksum", sa.String(length=120), nullable=False),
         sa.Column("size", sa.Integer(), nullable=False),
         sa.Column("dataset_id", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(["dataset_id"], ["data_set.id"]),
+        sa.ForeignKeyConstraint(["dataset_id"], ["data_set.id"], ondelete="CASCADE"),
     )
 
 

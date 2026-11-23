@@ -19,7 +19,7 @@ class SongMetadata(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     csv_filename = db.Column(db.String(255), nullable=False)
     columns = db.Column(db.Text, nullable=False)
-    song_metrics_id = db.Column(db.Integer, db.ForeignKey("song_metrics.id"), nullable=False)
+    song_metrics_id = db.Column(db.Integer, db.ForeignKey("song_metrics.id", ondelete="CASCADE"), nullable=False)
     song_metrics = db.relationship("SongMetrics", uselist=False, cascade="all, delete")
 
 
@@ -28,7 +28,7 @@ class SongFile(db.Model):
     name = db.Column(db.String(255), nullable=False)
     checksum = db.Column(db.String(120), nullable=False)
     size = db.Column(db.Integer, nullable=False)
-    dataset_id = db.Column(db.Integer, db.ForeignKey("data_set.id"), nullable=False)
+    dataset_id = db.Column(db.Integer, db.ForeignKey("data_set.id", ondelete="CASCADE"), nullable=False)
 
     def to_dict(self):
         base_url = request.host_url.rstrip("/") if has_request_context() else ""
@@ -51,10 +51,10 @@ class SongDataset(BaseDataset):
     """Dataset containing tabular Spotify and YouTube song measurements."""
 
     __tablename__ = "song_dataset"
-    id = db.Column(db.Integer, db.ForeignKey("data_set.id"), primary_key=True)
-    song_metadata_id = db.Column(db.Integer, db.ForeignKey("song_metadata.id"), nullable=False)
+    id = db.Column(db.Integer, db.ForeignKey("data_set.id", ondelete="CASCADE"), primary_key=True)
+    song_metadata_id = db.Column(db.Integer, db.ForeignKey("song_metadata.id", ondelete="CASCADE"), nullable=False)
     song_metadata = db.relationship("SongMetadata", uselist=False, cascade="all, delete")
-    song_files = db.relationship("SongFile", backref="song_dataset", cascade="all, delete", lazy=True)
+    song_files = db.relationship("SongFile", backref="song_dataset", cascade="all, delete-orphan", lazy=True)
 
     __mapper_args__ = {"polymorphic_identity": "song"}
 
