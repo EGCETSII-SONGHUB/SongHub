@@ -6,6 +6,16 @@
 
     <h1 class="h3 mb-3">My datasets</h1>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'message' else 'info' }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
     {% if datasets %}
         <div class=" col-12">
             <div class="card">
@@ -40,6 +50,11 @@
                                     <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}">
                                         <i data-feather="download"></i>
                                     </a>
+                                    {% if dataset.dataset_type == "song" %}
+                                        <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=dataset.id) }}" title="Edit song dataset">
+                                            <i data-feather="edit"></i>
+                                        </a>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -75,7 +90,10 @@
                 <div class="card">
                     <div class="card-body">
                         <div class="card-header">
-                            <h5 class="card-title">Unsynchronized datasets</h5>
+                            <h5 class="card-title mb-1">Unsynchronized datasets</h5>
+                            <p class="text-muted small mb-0">
+                                Saved locally without a Zenodo/Fakenodo DOI — visible only in your account and excluded from Explore until synchronized.
+                            </p>
                         </div>
                         <div class="card-body">
                             <table class="table">
@@ -104,6 +122,11 @@
                                             <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}">
                                                 <i data-feather="download"></i>
                                             </a>
+                                            {% if local_dataset.dataset_type == "song" %}
+                                                <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=local_dataset.id) }}" title="Edit song dataset">
+                                                    <i data-feather="edit"></i>
+                                                </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}

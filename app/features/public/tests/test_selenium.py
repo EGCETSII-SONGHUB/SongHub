@@ -19,13 +19,14 @@ from tests.selenium_support import close_driver, get_host_for_selenium_testing, 
 pytestmark = pytest.mark.e2e
 
 # Seeded development data. The landing page counters are derived from it.
-SEEDED_DATASET_TITLES = {
-    "Sample dataset 1",
-    "Sample dataset 2",
-    "Sample dataset 3",
+LATEST_SEEDED_TITLES = {
+    "Spotify and YouTube Pop & Dance",
+    "Spotify and YouTube Rock & Alternative",
     "Sample dataset 4",
+    "Sample dataset 3",
+    "Sample dataset 2",
 }
-SEEDED_DATASET_COUNT = 4
+SEEDED_DATASET_COUNT = 6
 SEEDED_FEATURE_MODEL_COUNT = 12
 LATEST_DATASETS_SHOWN = 5
 
@@ -117,7 +118,7 @@ def test_landing_page_lists_the_latest_datasets_with_links_to_their_doi():
         assert len(links) == expected_cards
 
         titles = {link.text.strip() for link in links}
-        assert titles == SEEDED_DATASET_TITLES
+        assert titles == LATEST_SEEDED_TITLES
 
         for link in links:
             assert re.search(r"/doi/10\.\d+/\S+$", link.get_attribute("href"))
