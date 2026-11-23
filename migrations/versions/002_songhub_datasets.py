@@ -1,14 +1,14 @@
 """Add polymorphic dataset types and SongHub metadata.
 
 Revision ID: 002_songhub_datasets
-Revises: 001
+Revises: 7c65000861a1
 """
+
 from alembic import op
 import sqlalchemy as sa
 
-
 revision = "002_songhub_datasets"
-down_revision = "001"
+down_revision = "7c65000861a1"
 branch_labels = None
 depends_on = None
 
