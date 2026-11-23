@@ -1,16 +1,15 @@
 # ----------------------------------------------------------------------------
 # Python Lint Workflow
-# This workflow runs linting and code style checks on every push and pull request.
+# This workflow runs linting and code style checks on every push (merge) to main and trunk.
 # It ensures the codebase follows PEP8, Black formatting, and import ordering standards.
 # ----------------------------------------------------------------------------
 
 name: Python Lint
 
 on:
-  # Trigger on every push to any branch
+  # Trigger on every push (merge) to main and trunk
   push:
-  # Trigger on every pull request (opened, updated, or synchronized)
-  pull_request:
+    branches: [main, trunk]
 
 jobs:
   lint:
