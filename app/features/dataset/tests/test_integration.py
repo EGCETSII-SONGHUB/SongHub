@@ -27,7 +27,10 @@ def _signup(test_client, email="owner@example.com", password="ownerpass"):
     )
     assert response.status_code in (302, 303)
     with test_client.application.app_context():
-        return UserRepository().get_by_email(email).id
+        user = UserRepository().get_by_email(email)
+        user.email_verified = True
+        UserRepository().session.commit()
+        return user.id
 
 
 def _make_dataset(user_id, title="Sample dataset", doi=None, tags="tag1,tag2"):
@@ -152,6 +155,49 @@ def test_upload_dataset_rejects_a_form_that_fails_validation(test_client):
     errors = response.get_json()["message"]
     assert "title" in errors
     assert "desc" in errors
+
+
+def test_unverified_user_sees_resend_banner_and_cannot_upload_dataset(test_client):
+    response = test_client.post(
+        "/signup/",
+        data={
+            "email": "unverified@example.com",
+            "password": "ownerpass",
+            "name": "Unverified",
+            "surname": "User",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code in (302, 303)
+
+    banner = test_client.get("/dataset/upload")
+    assert b"Resend email" in banner.data
+
+    upload = test_client.post("/dataset/upload", data={"title": "Blocked", "desc": "Blocked"})
+    assert upload.status_code == 403
+
+    api_upload = test_client.post("/api/v1/datasets/", json={})
+    assert api_upload.status_code == 403
+
+
+def test_unverified_user_cannot_upload_temporary_dataset_files(test_client):
+    test_client.post(
+        "/signup/",
+        data={
+            "email": "unverified-file@example.com",
+            "password": "ownerpass",
+            "name": "Unverified",
+            "surname": "User",
+        },
+        follow_redirects=False,
+    )
+
+    upload = test_client.post(
+        "/dataset/file/upload",
+        data={"file": (io.BytesIO(b"features\n\tRoot\n"), "model.uvl")},
+        content_type="multipart/form-data",
+    )
+    assert upload.status_code == 403
 
 
 def test_temp_file_upload_rejects_anything_that_is_not_uvl(test_client, monkeypatch, tmp_path):
