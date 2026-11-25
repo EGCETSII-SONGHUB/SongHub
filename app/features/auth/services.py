@@ -2,15 +2,14 @@ import os
 
 from flask import current_app, url_for
 from flask_login import current_user, login_user
-from flask_mail import Message
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from splent_framework.configuration.configuration import uploads_folder_name
 from splent_framework.services.BaseService import BaseService
 
 from app import db
-from app.features.auth import mail
 from app.features.auth.models import User
 from app.features.auth.repositories import UserRepository
+from app.features.email.services import EmailService
 from app.features.profile.models import UserProfile
 from app.features.profile.repositories import UserProfileRepository
 
@@ -58,19 +57,15 @@ class AuthenticationService(BaseService):
         return user
 
     def send_verification_email(self, user: User) -> None:
-        if not current_app.testing and not (
-            current_app.config.get("MAIL_SERVER") and current_app.config.get("MAIL_DEFAULT_SENDER")
-        ):
-            raise RuntimeError("Email verification requires MAIL_SERVER and MAIL_DEFAULT_SENDER configuration.")
-
         token = self.create_email_verification_token(user)
         verification_url = url_for("auth.verify_email", token=token, _external=True)
-        message = Message(
-            subject="Verify your email address",
-            recipients=[user.email],
-            body=f"Verify your email address by visiting this link:\n\n{verification_url}",
+        EmailService().send_email(
+            recipient=user.email,
+            subject="Welcome to UVLHub - verify your email address",
+            body=(
+                "Welcome to UVLHub!\n\n" "Verify your email address by visiting this link:\n\n" f"{verification_url}"
+            ),
         )
-        mail.send(message)
 
     def create_with_profile(self, **kwargs):
         try:
