@@ -27,12 +27,17 @@ pytestmark = pytest.mark.e2e
 
 # Seeded development data. Every seeded dataset is synchronized, so all of
 # them are searchable.
-SEEDED_DATASET_TITLES = {
+UVL_SEEDED_TITLES = {
     "Sample dataset 1",
     "Sample dataset 2",
     "Sample dataset 3",
     "Sample dataset 4",
 }
+SONG_SEEDED_TITLES = {
+    "Spotify and YouTube Rock & Alternative",
+    "Spotify and YouTube Pop & Dance",
+}
+SEEDED_DATASET_TITLES = UVL_SEEDED_TITLES | SONG_SEEDED_TITLES
 SEEDED_DATASET_COUNT = len(SEEDED_DATASET_TITLES)
 
 # "file7.uvl" is the only seeded UVL file whose name contains "file7", and it
@@ -195,10 +200,10 @@ def test_filtering_by_a_publication_type_nobody_uses_empties_the_result_list():
         publication_type.select_by_value("book")
         wait_for_results(driver, 0)
 
-        # Every seeded dataset is a data management plan.
+        # Only the 4 UVL datasets are data management plans.
         publication_type.select_by_value("datamanagementplan")
-        cards = wait_for_results(driver, SEEDED_DATASET_COUNT)
-        assert card_titles(cards) == SEEDED_DATASET_TITLES
+        cards = wait_for_results(driver, len(UVL_SEEDED_TITLES))
+        assert card_titles(cards) == UVL_SEEDED_TITLES
     finally:
         close_driver(driver)
 

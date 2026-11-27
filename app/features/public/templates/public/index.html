@@ -4,104 +4,121 @@
 
 {% block content %}
 
-    <h1 class="h2 mb-3">
+    <section class="sh-hero">
+        <div class="row align-items-center g-3 position-relative" style="z-index: 1;">
+            <div class="col-lg-8">
+                <span class="sh-hero-pill">
+                    <i data-feather="disc" style="width: 14px; height: 14px;"></i>
+                    Open Science Dataset Platform
+                </span>
+                <h1 class="sh-hero-title">Discover, validate &amp; share musical and UVL datasets</h1>
+                <p class="sh-hero-subtitle">
+                    Explore curated Spotify &amp; YouTube track telemetry alongside Universal Variability Language (UVL) feature models, synchronized with Zenodo DOIs.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end d-flex flex-wrap gap-2 justify-content-lg-end">
+                <a href="{{ url_for('songdataset.upload_page') if current_user.is_authenticated else url_for('auth.login') }}"
+                   class="btn btn-light fw-semibold">
+                    <i data-feather="music" class="center-button-icon"></i>
+                    Upload song CSV
+                </a>
+                <a href="{{ url_for('community.index') }}" class="btn btn-outline-light">
+                    <i data-feather="users" class="center-button-icon"></i>
+                    Communities
+                </a>
+            </div>
+        </div>
+    </section>
 
-        <b>Latest</b> datasets
-    </h1>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h2 mb-0">
+            <b>Latest</b> datasets
+        </h1>
+        <span class="text-muted small">Synchronized &amp; citable via DOI</span>
+    </div>
 
     <div class="row">
 
         <div class="mb-2 col-xl-8 col-lg-12 col-md-12 col-sm-12">
 
             {% for dataset in datasets %}
-                <div class="card">
+                <div class="card sh-card-interactive">
                     <div class="card-body">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <h2>
-
-                                <a href="{{ dataset.get_uvlhub_doi() }}">
+                        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-2">
+                            <h2 class="h4 mb-0">
+                                <a href="{{ dataset.get_uvlhub_doi() }}" class="sh-card-title-link">
                                     {{ dataset.ds_meta_data.title }}
                                 </a>
-
                             </h2>
-                            <div>
-                                <span class="badge bg-secondary">{{ dataset.get_cleaned_publication_type() }}</span>
+                            <div class="d-flex flex-wrap gap-1 align-items-center">
+                                <span class="badge {{ 'sh-badge-song' if dataset.dataset_type == 'song' else 'sh-badge-uvl' }}">
+                                    {{ 'Song' if dataset.dataset_type == 'song' else 'UVL' }}
+                                </span>
+                                <span class="badge sh-badge-pub">{{ dataset.get_cleaned_publication_type() }}</span>
                             </div>
                         </div>
-                        <p class="text-secondary">{{ dataset.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        <p class="text-secondary small mb-3">
+                            <i data-feather="calendar" style="width: 13px; height: 13px; margin-top: -2px;" class="me-1"></i>
+                            {{ dataset.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                        </p>
 
-                        <div class="row mb-2">
+                        <p class="card-text mb-3">{{ dataset.ds_meta_data.description }}</p>
 
-                            <div class="col-12">
-                                <p class="card-text">{{ dataset.ds_meta_data.description }}</p>
+                        {% if dataset.dataset_type == 'song' and dataset.song_metadata and dataset.song_metrics %}
+                            <div class="sh-song-mini-stats mb-3 d-flex flex-wrap gap-3 align-items-center">
+                                <span><i data-feather="music" style="width: 14px; height: 14px;" class="me-1"></i>{{ dataset.song_metrics.number_of_songs }} songs</span>
+                                <span><i data-feather="mic" style="width: 14px; height: 14px;" class="me-1"></i>{{ dataset.song_metrics.number_of_artists }} artists</span>
+                                <span><i data-feather="headphones" style="width: 14px; height: 14px;" class="me-1"></i>avg. {{ "%.0f"|format(dataset.song_metrics.average_streams or 0) }} streams</span>
                             </div>
+                        {% endif %}
 
+                        {% if dataset.ds_meta_data.authors %}
+                        <div class="mb-2">
+                            {% for author in dataset.ds_meta_data.authors %}
+                                <p class="p-0 m-0 small text-muted">
+                                    {{ author.name }}
+                                    {% if author.affiliation %}
+                                        ({{ author.affiliation }})
+                                    {% endif %}
+                                    {% if author.orcid %}
+                                        ({{ author.orcid }})
+                                    {% endif %}
+                                </p>
+                            {% endfor %}
                         </div>
+                        {% endif %}
 
-                        <div class="row mb-2 mt-4">
-
-                            <div class="col-12">
-                                {% for author in dataset.ds_meta_data.authors %}
-                                    <p class="p-0 m-0">
-                                        {{ author.name }}
-                                        {% if author.affiliation %}
-                                            ({{ author.affiliation }})
-                                        {% endif %}
-                                        {% if author.orcid %}
-                                            ({{ author.orcid }})
-                                        {% endif %}
-                                    </p>
-                                {% endfor %}
-                            </div>
-
-
-                        </div>
-
-                        <div class="row mb-2">
-
-                            <div class="col-12">
-                                <a href="{{ dataset.get_uvlhub_doi() }}">{{ dataset.get_uvlhub_doi() }}</a>
-                                 <div id="dataset_doi_uvlhub_{{ dataset.id }}" style="display: none">
+                        <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+                            <a href="{{ dataset.get_uvlhub_doi() }}" class="small text-decoration-none">{{ dataset.get_uvlhub_doi() }}</a>
+                            <div id="dataset_doi_uvlhub_{{ dataset.id }}" style="display: none">
                                 {{ dataset.get_uvlhub_doi() }}
                             </div>
 
-                            <i data-feather="clipboard" class="center-button-icon"
+                            <i data-feather="clipboard" class="center-button-icon text-muted"
                                style="cursor: pointer"
+                               title="Copy DOI"
                                onclick="copyText('dataset_doi_uvlhub_{{ dataset.id }}')"></i>
-                            </div>
-
-
-
                         </div>
 
-                        <div class="row mb-2">
-
-                            <div class="col-12">
-                                {% if dataset.ds_meta_data.tags %}
-                                    {% for tag in dataset.ds_meta_data.tags.split(',') %}
-                                        <span class="badge bg-secondary">{{ tag.strip() }}</span>
-                                    {% endfor %}
-                                {% endif %}
-                            </div>
-
+                        {% if dataset.ds_meta_data.tags %}
+                        <div class="mb-3 d-flex flex-wrap gap-1">
+                            {% for tag in dataset.ds_meta_data.tags.split(',') %}
+                                <span class="badge sh-tag-pill">{{ tag.strip() }}</span>
+                            {% endfor %}
                         </div>
+                        {% endif %}
 
-                        <div class="row  mt-4">
-                            <div class="col-12">
-                                <a href="{{ dataset.get_uvlhub_doi() }}" class="btn btn-outline-primary btn-sm"
-                                   style="border-radius: 5px;">
-                                    <i data-feather="eye" class="center-button-icon"></i>
-                                    View dataset
-                                </a>
+                        <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top">
+                            <a href="{{ dataset.get_uvlhub_doi() }}" class="btn btn-outline-primary btn-sm">
+                                <i data-feather="eye" class="center-button-icon"></i>
+                                View dataset
+                            </a>
 
-                                <a href="/dataset/download/{{ dataset.id }}" class="btn btn-outline-primary btn-sm"
-                                   style="border-radius: 5px;">
-                                    <i data-feather="download" class="center-button-icon"></i>
-                                    Download ({{ dataset.get_file_total_size_for_human() }})
-                                </a>
-                            </div>
+                            <a href="/dataset/download/{{ dataset.id }}" class="btn btn-outline-secondary btn-sm">
+                                <i data-feather="download" class="center-button-icon"></i>
+                                Download ({{ dataset.get_file_total_size_for_human() }})
+                            </a>
                         </div>
-
 
                     </div>
                 </div>
@@ -120,82 +137,45 @@
 
                 <div class="col-12">
 
-                <div class="card">
-
-                    <div class="card-body">
-
-                        <h2> <b>Hub statistics</b> </h2>
-                    
-                        <h1 class="h2 mb-3">
-                    
-                            <h4 class="h4 mb-3" class="stats-color">
-                                <i data-feather="database" class="align-middle mr-2 stats-color"></i>&nbsp;{{ datasets_counter }} datasets
-                            </h4>
-                    
-                            <h4 class="h4 mb-3" class="stats-color">
-                                <i data-feather="file" class="align-middle mr-2 stats-color"></i>&nbsp;{{ feature_models_counter }} feature models
-                            </h4>
-                    
-                            <h4 class="h4 mb-3" class="stats-color">
-                                <i data-feather="eye" class="align-middle mr-2 stats-color"></i>&nbsp;{{ total_dataset_views }} datasets viewed
-                            </h4>
-                    
-                            <h4 class="h4 mb-3" class="stats-color">
-                                <i data-feather="eye" class="align-middle mr-2 stats-color"></i>&nbsp;{{ total_feature_model_views }} feature models viewed
-                            </h4>
-                    
-                            <h4 class="h4 mb-3" class="stats-color">
-                                <i data-feather="download" class="align-middle mr-2 stats-color"></i>&nbsp;{{ total_dataset_downloads }} datasets downloaded
-                            </h4>
-                    
-                            <h4 class="h4" class="stats-color">
-                                <i data-feather="download" class="align-middle mr-2 stats-color"></i>&nbsp;{{ total_feature_model_downloads }} feature models downloaded
-                            </h4>
-                    
-                        </h1>
-                    
-                    </div>                    
-
-                </div>
-            </div>
-
-                <div class="col-12">
-
                     <div class="card">
 
                         <div class="card-body">
-                    
 
-                    
-                            <h2> <b>Related publication</b> </h2>
-                            
-                            David Romero-Organvidez, José A. Galindo, Chico Sundermann, Jose-Miguel Horcas, David Benavides. 
-                            <i>UVLHub: A feature model data repository using UVL and open science principles</i>,
-                            Journal of Systems and Software,
-                            2024,
-                            112150,
-                            ISSN 0164-1212,
-                            <a href="https://doi.org/10.1016/j.jss.2024.112150" target="_blank">https://doi.org/10.1016/j.jss.2024.112150</a>
-                    
+                            <h2 class="h4 mb-3"><b>Hub statistics</b></h2>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="database"></i></span>
+                                <span class="sh-stat-text">{{ datasets_counter }} datasets</span>
+                            </div>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="file"></i></span>
+                                <span class="sh-stat-text">{{ feature_models_counter }} feature models</span>
+                            </div>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="eye"></i></span>
+                                <span class="sh-stat-text">{{ total_dataset_views }} datasets viewed</span>
+                            </div>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="activity"></i></span>
+                                <span class="sh-stat-text">{{ total_feature_model_views }} feature models viewed</span>
+                            </div>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="download"></i></span>
+                                <span class="sh-stat-text">{{ total_dataset_downloads }} datasets downloaded</span>
+                            </div>
+
+                            <div class="sh-stat-row">
+                                <span class="sh-stat-icon"><i data-feather="download-cloud"></i></span>
+                                <span class="sh-stat-text">{{ total_feature_model_downloads }} feature models downloaded</span>
+                            </div>
+
                         </div>
-                    
-                        <div class="card-body mt-0 pt-0">
-                    
-                            <button onclick="copyText('bibtex_cite')" class="btn btn-light" style="border-radius: 5px; margin-right: 10px">
-                                <i data-feather="clipboard" class="center-button-icon"></i>
-                                Copy in BibTex
-                            </button>
-                    
-                            <button onclick="copyText('ris_cite')" class="btn btn-light" style="border-radius: 5px;">
-                                <i data-feather="clipboard" class="center-button-icon"></i>
-                                Copy in RIS
-                            </button>
-                    
-                        </div>
-                    
+
                     </div>
-                    
-
                 </div>
 
                 {% if current_user.is_anonymous %}
@@ -209,29 +189,21 @@
 
                             <div class="card-body card-body-slim">
 
-                                What are you waiting for to upload your fantastic feature models in UVL format?
+                                <p class="mb-3 opacity-90">
+                                    Share your Spotify &amp; YouTube song CSV datasets or UVL feature models with Zenodo DOIs.
+                                </p>
 
-                                <div class="row mt-2">
+                                <div class="d-grid gap-2">
+                                    <a href="/signup" class="btn btn-light fw-semibold text-primary">
+                                        <i data-feather="user-plus" class="center-button-icon"></i>
+                                        Sign up
+                                    </a>
 
-                                    <div class="col-12">
-                                        <a href="/signup"
-                                           class="btn btn-dark"
-                                           style="background-color: #0662A6; border-color: #0662A6">
-                                            <i data-feather="user-plus" class="center-button-icon"></i>
-                                            Sign up
-                                        </a>
-                                    </div>
-
-                                    <div class="col-12 mt-2">
-                                        <a href="/login"
-                                           class="btn btn-outline-dark" style=" border-color: #0662A6">
-                                            <i data-feather="log-in" class="center-button-icon"></i>
-                                            I am already registered!
-                                        </a>
-                                    </div>
-
+                                    <a href="/login" class="btn btn-outline-light">
+                                        <i data-feather="log-in" class="center-button-icon"></i>
+                                        I am already registered!
+                                    </a>
                                 </div>
-
 
                             </div>
 
@@ -242,40 +214,68 @@
 
                 <div class="col-12">
 
-                    <div class="card card-dark">
+                    <div class="card">
 
-                        <h2 class="card-title card-title-light">
-                            What is <b>uvlhub.io</b>?
-                        </h2>
+                        <div class="card-body">
 
-                        <div class="card-body card-body-slim">
+                            <h2 class="h4 mb-2"><b>Related publication</b></h2>
 
-                            <strong>uvlhub.io</strong> is a repository of feature models in UVL format integrated with
-                            Zenodo and FlamaPy developed by DiversoLab
+                            <p class="small text-muted mb-3">
+                                David Romero-Organvidez, José A. Galindo, Chico Sundermann, Jose-Miguel Horcas, David Benavides.
+                                <i>UVLHub: A feature model data repository using UVL and open science principles</i>,
+                                Journal of Systems and Software,
+                                2024,
+                                112150,
+                                ISSN 0164-1212,
+                                <a href="https://doi.org/10.1016/j.jss.2024.112150" target="_blank">https://doi.org/10.1016/j.jss.2024.112150</a>
+                            </p>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <button onclick="copyText('bibtex_cite')" class="btn btn-outline-secondary btn-sm">
+                                    <i data-feather="clipboard" class="center-button-icon"></i>
+                                    Copy in BibTex
+                                </button>
+
+                                <button onclick="copyText('ris_cite')" class="btn btn-outline-secondary btn-sm">
+                                    <i data-feather="clipboard" class="center-button-icon"></i>
+                                    Copy in RIS
+                                </button>
+                            </div>
 
                         </div>
 
+                    </div>
+
+                </div>
+
+                <div class="col-12">
+
+                    <div class="card card-dark">
+
                         <h2 class="card-title card-title-light">
+                            What is <b>SongHub</b>?
+                        </h2>
+
+                        <div class="card-body card-body-slim text-light opacity-75">
+                            <strong class="text-white">SongHub</strong> extends <strong>uvlhub.io</strong> into an extensible Open Science platform for both musical telemetry datasets and UVL feature models integrated with Zenodo and FlamaPy.
+                        </div>
+
+                        <h2 class="card-title card-title-light mt-2">
                             Can I contribute?
                         </h2>
 
                         <div class="card-body card-body-slim">
-
-                            Sure! You can make a fork of our official repository on GitHub,
-                            create fantastic features and then make a pull request to us.
-
-                            <br><br>
-
-                            <a href="https://github.com/diverso-lab/uvlhub" target="_blank" class="btn btn-primary">
+                            <p class="text-light opacity-75 mb-3">
+                                Sure! Fork our repository on GitHub, build new features or dataset domains, and contribute back.
+                            </p>
+                            <a href="https://github.com/diverso-lab/uvlhub" target="_blank" class="btn btn-primary btn-sm">
                                 Go to GitHub</a>
-
                         </div>
 
                     </div>
                 </div>
 
             </div>
-
 
         </div>
 

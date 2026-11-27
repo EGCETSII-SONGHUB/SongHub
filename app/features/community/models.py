@@ -39,7 +39,7 @@ class Community(db.Model):
         lazy="selectin",
     )
     datasets = db.relationship(
-        "DataSet",
+        "BaseDataset",
         secondary=community_datasets,
         backref=db.backref("communities", lazy=True),
         lazy=True,

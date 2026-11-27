@@ -4,60 +4,91 @@
 
 {% block content %}
 
-    <h1 class="h3 mb-3">My datasets</h1>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h1 class="h3 mb-0">My datasets</h1>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('songdataset.upload_page') }}" class="btn btn-outline-primary btn-sm">
+                <i data-feather="music" class="center-button-icon"></i> Upload song CSV
+            </a>
+            <a href="{{ url_for('dataset.create_dataset') }}" class="btn btn-primary btn-sm">
+                <i data-feather="upload" class="center-button-icon"></i> Upload dataset
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category if category != 'message' else 'info' }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
     {% if datasets %}
-        <div class=" col-12">
+        <div class="col-12">
             <div class="card">
-
-                <div class="card-body">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Description</th>
-                            <th>Publication type</th>
-                            <th>Dataset DOI</th>
-                            <th>Options</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for dataset in datasets %}
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Synchronized datasets</h5>
+                    <span class="badge sh-badge-song">{{ datasets|length }} published</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
                             <tr>
-                                <td>
-                                    <a href="{{ dataset.get_uvlhub_doi() }}">
-                                        {{ dataset.ds_meta_data.title }}
-                                    </a>
-                                </td>
-                                <td>{{ dataset.ds_meta_data.description }}</td>
-                                <td>{{ dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
-                                <td><a href="{{ dataset.get_uvlhub_doi() }}"
-                                       target="_blank">{{ dataset.get_uvlhub_doi() }}</a></td>
-                                <td>
-                                    <a href="{{ dataset.get_uvlhub_doi() }}">
-                                        <i data-feather="eye"></i>
-                                    </a>
-                                    <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}">
-                                        <i data-feather="download"></i>
-                                    </a>
-                                </td>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Publication type</th>
+                                <th>Dataset DOI</th>
+                                <th class="text-end">Options</th>
                             </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                            {% for dataset in datasets %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ dataset.get_uvlhub_doi() }}" class="fw-semibold text-decoration-none">{{ dataset.ds_meta_data.title }}</a>
+                                        <span class="badge {{ 'sh-badge-song' if dataset.dataset_type == 'song' else 'sh-badge-uvl' }} ms-1">
+                                            {{ 'Song' if dataset.dataset_type == 'song' else 'UVL' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-muted">{{ dataset.ds_meta_data.description }}</td>
+                                    <td>{{ dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
+                                    <td><a href="{{ dataset.get_uvlhub_doi() }}"
+                                           target="_blank" class="small">{{ dataset.get_uvlhub_doi() }}</a></td>
+                                    <td class="text-end text-nowrap">
+                                        <a href="{{ dataset.get_uvlhub_doi() }}" class="btn btn-outline-secondary btn-sm" title="View dataset">
+                                            <i data-feather="eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}" class="btn btn-outline-secondary btn-sm" title="Download dataset">
+                                            <i data-feather="download"></i>
+                                        </a>
+                                        {% if dataset.dataset_type == "song" %}
+                                            <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=dataset.id) }}" class="btn btn-outline-primary btn-sm" title="Edit song dataset">
+                                                <i data-feather="edit"></i>
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
             </div>
 
         </div>
     {% else %}
-        <div class="col-12 col-md-6">
+        <div class="col-12 col-md-7">
             <div class="card">
                 <div class="card-header">
                     <h5 class="card-title mb-0">No datasets found</h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">
+                    <p class="card-text text-muted">
                         You have not created any dataset synchronized with Zenodo, are you up for it?
                     </p>
                     <a href="{{ url_for('dataset.create_dataset') }}" class="btn btn-primary">
@@ -68,42 +99,49 @@
     {% endif %}
 
     <div class="row">
-
-
         <div class="col-12">
             {% if local_datasets %}
                 <div class="card">
-                    <div class="card-body">
-                        <div class="card-header">
-                            <h5 class="card-title">Unsynchronized datasets</h5>
-                        </div>
-                        <div class="card-body">
-                            <table class="table">
+                    <div class="card-header">
+                        <h5 class="card-title mb-1">Unsynchronized datasets</h5>
+                        <p class="text-muted small mb-0">
+                            Saved locally without a Zenodo/Fakenodo DOI — visible only in your account and excluded from Explore until synchronized.
+                        </p>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
                                 <thead>
                                 <tr>
                                     <th>Title</th>
                                     <th>Description</th>
                                     <th>Publication type</th>
-                                    <th>Options</th>
+                                    <th class="text-end">Options</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 {% for local_dataset in local_datasets %}
                                     <tr>
                                         <td>
-                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
-                                                {{ local_dataset.ds_meta_data.title }}
-                                            </a>
+                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}" class="fw-semibold text-decoration-none">{{ local_dataset.ds_meta_data.title }}</a>
+                                            <span class="badge {{ 'sh-badge-song' if local_dataset.dataset_type == 'song' else 'sh-badge-uvl' }} ms-1">
+                                                {{ 'Song' if local_dataset.dataset_type == 'song' else 'UVL' }}
+                                            </span>
                                         </td>
-                                        <td>{{ local_dataset.ds_meta_data.description }}</td>
+                                        <td class="text-muted">{{ local_dataset.ds_meta_data.description }}</td>
                                         <td>{{ local_dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
-                                        <td>
-                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
+                                        <td class="text-end text-nowrap">
+                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}" class="btn btn-outline-secondary btn-sm" title="View draft">
                                                 <i data-feather="eye"></i>
                                             </a>
-                                            <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}">
+                                            <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}" class="btn btn-outline-secondary btn-sm" title="Download draft">
                                                 <i data-feather="download"></i>
                                             </a>
+                                            {% if local_dataset.dataset_type == "song" %}
+                                                <a href="{{ url_for('songdataset.edit_dataset_page', dataset_id=local_dataset.id) }}" class="btn btn-outline-primary btn-sm" title="Edit song dataset">
+                                                    <i data-feather="edit"></i>
+                                                </a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -114,5 +152,6 @@
                 </div>
             {% endif %}
         </div>
+    </div>
 
 {% endblock %}

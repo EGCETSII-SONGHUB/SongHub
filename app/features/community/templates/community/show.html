@@ -43,55 +43,62 @@
 
     <div class="row">
         <div class="col-xl-8 col-lg-12">
-            <div class="card mb-3">
+            <div class="card mb-4">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <img src="{{ community.get_logo_url() or url_for('static', filename='img/icons/icon-250x250.png') }}"
                              alt="{{ community.name }} logo"
-                             class="rounded me-3"
-                             style="width: 72px; height: 72px; object-fit: contain; background: #f8f9fa; padding: 6px;">
+                             class="rounded-3 border me-3"
+                             style="width: 72px; height: 72px; object-fit: contain; background: #f8fafc; padding: 6px;">
                         <div>
-                            <h1 class="mb-1"><b>{{ community.name }}</b></h1>
+                            <h1 class="h2 mb-1"><b>{{ community.name }}</b></h1>
                             {% if community.created_at %}
-                                <p class="text-secondary mb-0">
+                                <p class="text-secondary small mb-0">
                                     Created {{ community.created_at.strftime('%B %d, %Y at %I:%M %p') }}
                                 </p>
                             {% endif %}
                         </div>
                     </div>
-                    <p class="card-text mb-0">{{ community.description }}</p>
+                    <p class="card-text text-muted mb-0">{{ community.description }}</p>
                 </div>
             </div>
 
-            <h2 class="h4 mb-3">Datasets ({{ datasets|length }})</h2>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h4 mb-0">Datasets ({{ datasets|length }})</h2>
+            </div>
 
             {% if datasets %}
                 {% for dataset in datasets %}
-                    <div class="card mb-3">
+                    <div class="card sh-card-interactive mb-3">
                         <div class="card-body">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <h3 class="h5 mb-1">
+                            <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-1">
+                                <h3 class="h5 mb-0">
                                     {% if dataset.ds_meta_data.dataset_doi %}
-                                        <a href="{{ url_for('dataset.subdomain_index', doi=dataset.ds_meta_data.dataset_doi) }}">
+                                        <a href="{{ url_for('dataset.subdomain_index', doi=dataset.ds_meta_data.dataset_doi) }}" class="sh-card-title-link">
                                             {{ dataset.ds_meta_data.title }}
                                         </a>
                                     {% elif current_user.is_authenticated and current_user.id == dataset.user_id %}
-                                        <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=dataset.id) }}">
+                                        <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=dataset.id) }}" class="sh-card-title-link">
                                             {{ dataset.ds_meta_data.title }}
                                         </a>
                                     {% else %}
                                         {{ dataset.ds_meta_data.title }}
                                     {% endif %}
                                 </h3>
-                                <span class="badge bg-secondary">{{ dataset.get_cleaned_publication_type() }}</span>
+                                <div class="d-flex flex-wrap gap-1 align-items-center">
+                                    <span class="badge {{ 'sh-badge-song' if dataset.dataset_type == 'song' else 'sh-badge-uvl' }}">
+                                        {{ 'Song' if dataset.dataset_type == 'song' else 'UVL' }}
+                                    </span>
+                                    <span class="badge sh-badge-pub">{{ dataset.get_cleaned_publication_type() }}</span>
+                                </div>
                             </div>
-                            <p class="text-secondary small">{{ dataset.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
-                            <p class="card-text">{{ dataset.ds_meta_data.description }}</p>
+                            <p class="text-secondary small mb-2">{{ dataset.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                            <p class="card-text mb-2">{{ dataset.ds_meta_data.description }}</p>
 
                             {% if dataset.ds_meta_data.authors %}
                                 <div class="mb-2">
                                     {% for author in dataset.ds_meta_data.authors %}
-                                        <p class="p-0 m-0 small">
+                                        <p class="p-0 m-0 small text-muted">
                                             {{ author.name }}
                                             {% if author.affiliation %}({{ author.affiliation }}){% endif %}
                                             {% if author.orcid %}({{ author.orcid }}){% endif %}
@@ -101,14 +108,14 @@
                             {% endif %}
 
                             {% if dataset.ds_meta_data.tags %}
-                                <div class="mb-3">
+                                <div class="mb-3 d-flex flex-wrap gap-1">
                                     {% for tag in dataset.ds_meta_data.tags.split(',') %}
-                                        <span class="badge bg-secondary">{{ tag.strip() }}</span>
+                                        <span class="badge sh-tag-pill">{{ tag.strip() }}</span>
                                     {% endfor %}
                                 </div>
                             {% endif %}
 
-                            <div class="d-flex gap-2 align-items-center">
+                            <div class="d-flex gap-2 align-items-center pt-2 border-top">
                                 <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}" class="btn btn-outline-primary btn-sm">
                                     <i data-feather="download" class="center-button-icon"></i>
                                     Download ({{ dataset.get_file_total_size_for_human() }})
