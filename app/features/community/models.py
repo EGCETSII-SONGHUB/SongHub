@@ -4,6 +4,8 @@ from flask import url_for
 
 from app import db
 
+from app.features.dataset.models import DataSet  # noqa: F401
+
 community_curators = db.Table(
     "community_curators",
     db.Column("community_id", db.Integer, db.ForeignKey("community.id"), primary_key=True),
