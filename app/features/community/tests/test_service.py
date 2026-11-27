@@ -9,6 +9,7 @@ from werkzeug.datastructures import FileStorage
 
 from app.features.auth.repositories import UserRepository
 from app.features.community.forms import CommunityForm
+from app.features.community.models import CommunityDatasetRequest
 from app.features.community.seeders import CommunitySeeder
 from app.features.community.services import CommunityService
 from app.features.dataset.models import PublicationType
@@ -32,6 +33,14 @@ def _make_dataset(user, title: str):
         ds_meta_data_id=meta.id,
         created_at=datetime.now(timezone.utc),
     )
+
+
+def _make_community(test_app, service, creator, name: str):
+    with test_app.test_request_context(
+        "/community/create", method="POST", data={"name": name, "description": f"{name} description"}
+    ):
+        community, _ = service.create_community(CommunityForm(), creator=creator)
+    return community
 
 
 def _image_upload(filename: str = "logo.png", content: bytes = b"fake-png-bytes") -> FileStorage:
@@ -176,34 +185,6 @@ def test_update_community_curator_can_edit_and_preserves_or_replaces_logo(
         assert os.path.isfile(os.path.join(service.logos_directory(), replaced.logo))
 
 
-def test_add_dataset_allows_only_dataset_owner_even_against_curator(test_app, clean_database):
-    with test_app.app_context():
-        curator = _make_user("curator@example.com")
-        owner = _make_user("owner@example.com")
-        owners_dataset = _make_dataset(owner, "Owner Songs")
-        service = CommunityService()
-
-        with test_app.test_request_context(
-            "/community/create", method="POST", data={"name": "Pop Hub", "description": "Pop datasets"}
-        ):
-            community, _ = service.create_community(CommunityForm(), creator=curator)
-
-        # Even the community's creator/curator cannot add another user's dataset.
-        with pytest.raises(PermissionError):
-            service.add_dataset(community, owners_dataset.id, user=curator)
-        assert community.datasets == []
-
-        # Missing dataset raises LookupError.
-        with pytest.raises(LookupError):
-            service.add_dataset(community, 99999, user=owner)
-
-        # Dataset owner can add their own dataset (and repeating it is idempotent).
-        added = service.add_dataset(community, owners_dataset.id, user=owner)
-        service.add_dataset(community, owners_dataset.id, user=owner)
-        assert added.id == owners_dataset.id
-        assert [d.id for d in community.datasets] == [owners_dataset.id]
-
-
 def test_remove_dataset_and_add_curator_permissions(test_app, clean_database):
     with test_app.app_context():
         curator = _make_user("curator@example.com")
@@ -217,7 +198,8 @@ def test_remove_dataset_and_add_curator_permissions(test_app, clean_database):
         ):
             community, _ = service.create_community(CommunityForm(), creator=curator)
 
-        service.add_dataset(community, ds.id, user=owner)
+        community.datasets.append(ds)
+        service.repository.session.commit()
 
         with pytest.raises(PermissionError):
             service.remove_dataset(community, ds.id, user=stranger)
@@ -299,3 +281,151 @@ def test_add_curator_by_email_and_remove_curator(test_app, clean_database):
         assert remove_err is None
         assert community.is_curator(candidate) is False
         assert community.is_curator(curator) is True
+
+
+def test_propose_dataset_creates_pending_request(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        ds = _make_dataset(owner, "Proposed Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Proposal Hub")
+
+        req = service.propose_dataset(community, ds.id, user=owner)
+
+        assert req.status == CommunityDatasetRequest.STATUS_PENDING
+        assert req.requester_id == owner.id
+        assert req.dataset_id == ds.id
+        assert req.community_id == community.id
+        # Pending requests must NOT show up as community datasets.
+        assert community.datasets == []
+
+
+def test_propose_dataset_rejects_invalid_proposals(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        other = _make_user("other@example.com")
+        ds = _make_dataset(owner, "Owner Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Rules Hub")
+
+        # Dataset that does not exist.
+        with pytest.raises(LookupError):
+            service.propose_dataset(community, 99999, user=owner)
+
+        # Only the owner can propose their dataset.
+        with pytest.raises(PermissionError):
+            service.propose_dataset(community, ds.id, user=other)
+
+        # Duplicate pending request.
+        service.propose_dataset(community, ds.id, user=owner)
+        with pytest.raises(ValueError):
+            service.propose_dataset(community, ds.id, user=owner)
+
+        # Dataset already in the community.
+        accepted_ds = _make_dataset(owner, "Already In")
+        community.datasets.append(accepted_ds)
+        service.repository.session.commit()
+        with pytest.raises(ValueError):
+            service.propose_dataset(community, accepted_ds.id, user=owner)
+
+
+def test_accept_request_adds_dataset_to_community(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        ds = _make_dataset(owner, "Accepted Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Accept Hub")
+        req = service.propose_dataset(community, ds.id, user=owner)
+
+        service.accept_request(req, curator, comment="  Welcome!  ")
+
+        assert req.status == CommunityDatasetRequest.STATUS_ACCEPTED
+        assert req.comment == "Welcome!"
+        assert req.resolved_by_id == curator.id
+        assert req.resolved_at is not None
+        assert [d.id for d in community.datasets] == [ds.id]
+
+
+def test_reject_request_does_not_add_dataset(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        ds = _make_dataset(owner, "Rejected Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Reject Hub")
+        req = service.propose_dataset(community, ds.id, user=owner)
+
+        service.reject_request(req, curator, comment="Off topic")
+
+        assert req.status == CommunityDatasetRequest.STATUS_REJECTED
+        assert req.comment == "Off topic"
+        assert community.datasets == []
+
+        # A rejected dataset can be proposed again.
+        again = service.propose_dataset(community, ds.id, user=owner)
+        assert again.status == CommunityDatasetRequest.STATUS_PENDING
+
+
+def test_only_curators_can_resolve_requests(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        outsider = _make_user("outsider@example.com")
+        ds = _make_dataset(owner, "Guarded Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Guarded Hub")
+        req = service.propose_dataset(community, ds.id, user=owner)
+
+        # Not even the dataset owner (requester) can resolve their own request.
+        for user in (outsider, owner):
+            with pytest.raises(PermissionError):
+                service.accept_request(req, user)
+            with pytest.raises(PermissionError):
+                service.reject_request(req, user)
+            with pytest.raises(PermissionError):
+                service.list_pending_requests(community, user)
+
+        assert req.status == CommunityDatasetRequest.STATUS_PENDING
+        assert community.datasets == []
+
+
+def test_request_cannot_be_resolved_twice(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        ds = _make_dataset(owner, "Once Songs")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "Once Hub")
+        req = service.propose_dataset(community, ds.id, user=owner)
+
+        service.reject_request(req, curator)
+        with pytest.raises(ValueError):
+            service.accept_request(req, curator)
+        assert community.datasets == []
+
+
+def test_list_pending_and_user_requests(test_app, clean_database):
+    with test_app.app_context():
+        curator = _make_user("curator@example.com")
+        owner = _make_user("owner@example.com")
+        ds1 = _make_dataset(owner, "First")
+        ds2 = _make_dataset(owner, "Second")
+        service = CommunityService()
+        community = _make_community(test_app, service, curator, "List Hub")
+        req1 = service.propose_dataset(community, ds1.id, user=owner)
+        req2 = service.propose_dataset(community, ds2.id, user=owner)
+
+        service.accept_request(req1, curator)
+
+        pending = service.list_pending_requests(community, curator)
+        assert [r.id for r in pending] == [req2.id]
+
+        # The author sees all their requests with their status.
+        mine = service.list_user_requests(owner)
+        assert {r.id: r.status for r in mine} == {
+            req1.id: CommunityDatasetRequest.STATUS_ACCEPTED,
+            req2.id: CommunityDatasetRequest.STATUS_PENDING,
+        }
