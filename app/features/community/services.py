@@ -11,7 +11,7 @@ from app.features.auth.models import User
 from app.features.auth.repositories import UserRepository
 from app.features.community.models import Community, CommunityDatasetRequest
 from app.features.community.repositories import CommunityDatasetRequestRepository, CommunityRepository
-from app.features.dataset.models import DataSet
+from app.features.dataset.models import BaseDataset
 from app.features.dataset.repositories import DataSetRepository
 
 ALLOWED_LOGO_EXTENSIONS = frozenset({"png", "jpg", "jpeg", "gif", "svg", "webp"})
@@ -265,9 +265,9 @@ class CommunityService(BaseService):
         self.repository.session.commit()
         return True, None
 
-    def get_available_datasets_for_user(self, community: Community, user_id: int) -> list[DataSet]:
+    def get_available_datasets_for_user(self, community: Community, user_id: int) -> list[BaseDataset]:
         """Return *user_id*'s datasets not yet linked to *community*, newest first."""
         linked_ids = {dataset.id for dataset in community.datasets}
         linked_ids |= {r.dataset_id for r in self.request_repository.get_pending_by_community(community.id)}
-        user_datasets = DataSet.query.filter_by(user_id=user_id).order_by(DataSet.created_at.desc()).all()
+        user_datasets = BaseDataset.query.filter_by(user_id=user_id).order_by(BaseDataset.created_at.desc()).all()
         return [dataset for dataset in user_datasets if dataset.id not in linked_ids]

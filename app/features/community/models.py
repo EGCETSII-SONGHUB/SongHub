@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from flask import url_for
 
 from app import db
-from app.features.dataset.models import DataSet  # noqa: F401
+from app.features.dataset.models import BaseDataset  # noqa: F401
 
 community_curators = db.Table(
     "community_curators",
@@ -100,7 +100,7 @@ class CommunityDatasetRequest(db.Model):
         "Community",
         backref=db.backref("dataset_requests", lazy=True, cascade="all, delete-orphan"),
     )
-    dataset = db.relationship("DataSet", backref=db.backref("community_requests", lazy=True))
+    dataset = db.relationship("BaseDataset", backref=db.backref("community_requests", lazy=True))
     requester = db.relationship(
         "User", foreign_keys=[requester_id], backref=db.backref("community_dataset_requests", lazy=True)
     )
