@@ -1,13 +1,19 @@
 import os
 
+from flask import current_app, url_for
 from flask_login import current_user, login_user
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from splent_framework.configuration.configuration import uploads_folder_name
 from splent_framework.services.BaseService import BaseService
 
+from app import db
 from app.features.auth.models import User
 from app.features.auth.repositories import UserRepository
+from app.features.email.services import EmailService
 from app.features.profile.models import UserProfile
 from app.features.profile.repositories import UserProfileRepository
+
+EMAIL_VERIFICATION_SALT = "email-verification"
 
 
 class AuthenticationService(BaseService):
@@ -24,6 +30,42 @@ class AuthenticationService(BaseService):
 
     def is_email_available(self, email: str) -> bool:
         return self.repository.get_by_email(email) is None
+
+    def create_email_verification_token(self, user: User) -> str:
+        serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+        return serializer.dumps({"user_id": user.id, "email": user.email}, salt=EMAIL_VERIFICATION_SALT)
+
+    def verify_email_token(self, token: str) -> User | None:
+        serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
+        try:
+            data = serializer.loads(
+                token,
+                salt=EMAIL_VERIFICATION_SALT,
+                max_age=current_app.config.get("EMAIL_VERIFICATION_MAX_AGE", 3600),
+            )
+        except (BadSignature, SignatureExpired):
+            return None
+
+        if not isinstance(data, dict):
+            return None
+        user = self.repository.get_by_id(data.get("user_id"))
+        if user is None or user.email != data.get("email"):
+            return None
+        if not user.email_verified:
+            user.email_verified = True
+            db.session.commit()
+        return user
+
+    def send_verification_email(self, user: User) -> None:
+        token = self.create_email_verification_token(user)
+        verification_url = url_for("auth.verify_email", token=token, _external=True)
+        EmailService().send_email(
+            recipient=user.email,
+            subject="Welcome to UVLHub - verify your email address",
+            body=(
+                "Welcome to UVLHub!\n\n" "Verify your email address by visiting this link:\n\n" f"{verification_url}"
+            ),
+        )
 
     def create_with_profile(self, **kwargs):
         try:

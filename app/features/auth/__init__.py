@@ -14,6 +14,12 @@ def init_feature(app: Flask) -> None:
     """
     register_asset("js", "auth.assets", subfolder="js", filename="scripts.js")
 
+    from app.features.auth.forms import ResendVerificationForm
+
+    @app.context_processor
+    def inject_resend_verification_form():
+        return {"resend_verification_form": ResendVerificationForm()}
+
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"

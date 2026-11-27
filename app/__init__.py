@@ -30,6 +30,17 @@ def create_app(config_name: str = "development") -> Flask:
     app = Flask(__name__)
 
     ConfigManager(app).load_config(config_name=config_name)
+    app.config.update(
+        MAIL_SERVER=os.getenv("MAIL_SERVER"),
+        MAIL_PORT=int(os.getenv("MAIL_PORT", "587")),
+        MAIL_USE_TLS=os.getenv("MAIL_USE_TLS", "true").lower() in {"1", "true", "yes"},
+        MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+        MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+        MAIL_DEFAULT_SENDER=os.getenv("MAIL_DEFAULT_SENDER"),
+        EMAIL_VERIFICATION_MAX_AGE=int(os.getenv("EMAIL_VERIFICATION_MAX_AGE", "3600")),
+    )
+    if config_name == "testing":
+        app.config.update(MAIL_SUPPRESS_SEND=True, MAIL_DEFAULT_SENDER="test@example.com")
     _apply_database_port(app)
     db.init_app(app)
     migrate.init_app(app, db)
