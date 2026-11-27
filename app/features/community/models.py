@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from flask import url_for
 
 from app import db
-
 from app.features.dataset.models import DataSet  # noqa: F401
 
 community_curators = db.Table(
