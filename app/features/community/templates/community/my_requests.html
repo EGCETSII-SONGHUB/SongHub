@@ -1,0 +1,56 @@
+{% extends "base_template.html" %}
+
+{% block title %}My requests{% endblock %}
+
+{% block content %}
+
+    <h1 class="h3 mb-3"><b>My dataset requests</b></h1>
+
+    {% if requests %}
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Dataset</th>
+                            <th>Community</th>
+                            <th>Status</th>
+                            <th>Curator comment</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                            <tr>
+                                <td>{{ req.dataset.ds_meta_data.title }}</td>
+                                <td>
+                                    <a href="{{ url_for('community.detail', community_id=req.community_id) }}">
+                                        {{ req.community.name }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if req.status == 'accepted' %}
+                                        <span class="badge bg-success">Accepted</span>
+                                    {% elif req.status == 'rejected' %}
+                                        <span class="badge bg-danger">Rejected</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.comment or '—' }}</td>
+                                <td>{{ req.created_at.strftime('%b %d, %Y') }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p class="card-text text-secondary mb-0">You have not proposed any datasets yet.</p>
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}

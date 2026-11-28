@@ -36,3 +36,9 @@ class AddCuratorForm(FlaskForm):
 
     email = StringField("Curator email", validators=[DataRequired(), Email(), Length(max=256)])
     submit = SubmitField("Add curator")
+
+
+class ReviewRequestForm(FlaskForm):
+    """Optional comment from the curator when accepting or rejecting a dataset request."""
+
+    comment = TextAreaField("Comment", validators=[Optional(), Length(max=1000)])

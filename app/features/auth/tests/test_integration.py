@@ -38,6 +38,24 @@ def test_signup_then_login_round_trip(test_client):
     assert login.status_code in (302, 303)
 
 
+def test_unverified_user_can_resend_verification_email(test_client):
+    test_client.post(
+        "/signup/",
+        data={
+            "email": "resend@example.com",
+            "password": "resendpass",
+            "name": "Resend",
+            "surname": "User",
+        },
+        follow_redirects=False,
+    )
+
+    response = test_client.post("/resend-verification", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"A new verification email has been sent." in response.data
+
+
 def test_login_with_invalid_credentials_keeps_form(test_client):
     response = test_client.post(
         "/login",

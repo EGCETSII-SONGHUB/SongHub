@@ -218,6 +218,22 @@
         <main class="content">
             <div class="container-fluid p-0" style="max-width: 1360px;">
 
+                {% if current_user.is_authenticated and not current_user.email_verified %}
+                <div class="alert alert-warning d-flex justify-content-between align-items-center" role="alert">
+                    <span>Please verify your email address before uploading datasets.</span>
+                    <form method="post" action="{{ url_for('auth.resend_verification') }}">
+                        {{ resend_verification_form.hidden_tag() }}
+                        <button class="btn btn-primary btn-sm" type="submit">Resend email</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endwith %}
+
                 {% block content %}{% endblock %}
 
             </div>

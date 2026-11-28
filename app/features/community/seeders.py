@@ -7,7 +7,7 @@ from splent_framework.seeders.BaseSeeder import BaseSeeder
 
 from app.features.auth.models import User
 from app.features.community.models import Community
-from app.features.dataset.models import DataSet
+from app.features.dataset.models import BaseDataset
 
 
 class CommunitySeeder(BaseSeeder):
@@ -52,8 +52,8 @@ class CommunitySeeder(BaseSeeder):
         diverso_community.curators.append(user2)
         diverso_community.curators.append(user1)
 
-        user1_datasets = DataSet.query.filter_by(user_id=user1.id).all()
-        user2_datasets = DataSet.query.filter_by(user_id=user2.id).all()
+        user1_datasets = BaseDataset.query.filter_by(user_id=user1.id).all()
+        user2_datasets = BaseDataset.query.filter_by(user_id=user2.id).all()
 
         for dataset in user1_datasets:
             us_community.datasets.append(dataset)

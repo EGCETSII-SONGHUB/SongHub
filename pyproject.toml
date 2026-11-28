@@ -12,6 +12,7 @@ features = [
     "community",
     "dataset",
     "songdataset",
+    "email",
     "explore",
     "featuremodel",
     "flamapy",

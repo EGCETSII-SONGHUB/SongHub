@@ -6,6 +6,7 @@ from io import BytesIO
 import pytest
 
 from app.features.auth.repositories import UserRepository
+from app.features.community.models import CommunityDatasetRequest
 from app.features.community.repositories import CommunityRepository
 from app.features.dataset.models import PublicationType
 from app.features.dataset.repositories import DataSetRepository, DSMetaDataRepository
@@ -208,7 +209,11 @@ def test_edit_community_restricted_to_curators_and_preserves_logo(test_client, m
         assert reloaded.logo == original_logo
 
 
-def test_only_dataset_owner_can_add_dataset_to_community(test_client):
+def _create_community_and_datasets(test_client):
+    """A curator creates a community; a second user (left logged in) owns a published dataset.
+
+    Returns a dict with the IDs needed by the request tests.
+    """
     curator_id = _signup(test_client, email="comm-curator@example.com", name="Clara", surname="Curator")
     test_client.post(
         "/community/create",
@@ -217,76 +222,209 @@ def test_only_dataset_owner_can_add_dataset_to_community(test_client):
     )
     with test_client.application.app_context():
         community_id = CommunityRepository().get_by_name("SoundHub Community").id
+        curator_dataset_id = _make_dataset(curator_id, title="Curator Own Dataset").id
 
     owner_id = _signup(test_client, email="ds-owner@example.com", name="Oscar", surname="Owner")
     with test_client.application.app_context():
         owner_dataset_id = _make_dataset(owner_id, title="Top Hits 2026", doi="10.1234/top-hits").id
-        curator_dataset_id = _make_dataset(curator_id, title="Curator Own Dataset").id
+
+    return {
+        "community_id": community_id,
+        "owner_dataset_id": owner_dataset_id,
+        "curator_dataset_id": curator_dataset_id,
+    }
+
+
+def _propose(test_client, community_id, dataset_id, **kwargs):
+    return test_client.post(
+        f"/community/{community_id}/datasets/propose",
+        data={"dataset_id": dataset_id},
+        **kwargs,
+    )
+
+
+def _get_request(community_id, dataset_id):
+    return CommunityDatasetRequest.query.filter_by(community_id=community_id, dataset_id=dataset_id).one()
+
+
+def test_propose_dataset_creates_pending_request_not_shown_in_community(test_client):
+    ids = _create_community_and_datasets(test_client)
+    community_id = ids["community_id"]
 
     # Anonymous user is redirected to login.
     test_client.get("/logout", follow_redirects=False)
-    anon_add = test_client.post(
-        f"/community/{community_id}/datasets/add",
-        data={"dataset_id": owner_dataset_id},
-        follow_redirects=False,
-    )
-    assert anon_add.status_code == 302
-    assert "/login" in anon_add.headers["Location"]
+    anon = _propose(test_client, community_id, ids["owner_dataset_id"], follow_redirects=False)
+    assert anon.status_code == 302
+    assert "/login" in anon.headers["Location"]
 
-    # Community curator CANNOT add a dataset owned by someone else -> 403 Forbidden.
-    _login(test_client, "comm-curator@example.com")
-    curator_attempt = test_client.post(
-        f"/community/{community_id}/datasets/add",
-        data={"dataset_id": owner_dataset_id},
-        follow_redirects=False,
-    )
-    assert curator_attempt.status_code == 403
+    _login(test_client, "ds-owner@example.com")
+
+    # A user cannot propose a dataset that belongs to someone else -> 403.
+    assert _propose(test_client, community_id, ids["curator_dataset_id"]).status_code == 403
+    # Missing dataset -> 404.
+    assert _propose(test_client, community_id, 99999).status_code == 404
+
+    # The owner can propose their own dataset: a pending request is created.
+    ok = _propose(test_client, community_id, ids["owner_dataset_id"], follow_redirects=False)
+    assert ok.status_code in (302, 303)
     with test_client.application.app_context():
+        req = _get_request(community_id, ids["owner_dataset_id"])
+        assert req.status == CommunityDatasetRequest.STATUS_PENDING
+        assert req.requester.email == "ds-owner@example.com"
         assert CommunityRepository().get_by_id(community_id).datasets == []
 
-    # Missing dataset returns 404.
-    assert (
-        test_client.post(
-            f"/community/{community_id}/datasets/add",
-            data={"dataset_id": 99999},
-            follow_redirects=False,
-        ).status_code
-        == 404
-    )
+    # Proposing the same dataset again is refused while the request is pending.
+    dup = _propose(test_client, community_id, ids["owner_dataset_id"], follow_redirects=True)
+    assert dup.status_code == 200
+    assert "already a pending request" in dup.get_data(as_text=True)
+    with test_client.application.app_context():
+        assert CommunityDatasetRequest.query.count() == 1
 
-    # Dataset owner CAN add their own dataset -> 302 and displayed on community & dataset pages.
+    # The community page only lists accepted datasets, so the pending one is hidden.
+    _login(test_client, "comm-curator@example.com")
+    page = test_client.get(f"/community/{community_id}")
+    assert page.status_code == 200
+    assert "Top Hits 2026" not in page.get_data(as_text=True)
+
+
+def test_only_curators_can_view_and_resolve_requests(test_client):
+    ids = _create_community_and_datasets(test_client)
+    community_id = ids["community_id"]
+    dataset_id = ids["owner_dataset_id"]
+    _propose(test_client, community_id, dataset_id)
+    with test_client.application.app_context():
+        request_id = _get_request(community_id, dataset_id).id
+
+    pending_url = f"/community/{community_id}/requests"
+    accept_url = f"/community/{community_id}/requests/{request_id}/accept"
+    reject_url = f"/community/{community_id}/requests/{request_id}/reject"
+
+    # Anonymous users are redirected to login.
+    test_client.get("/logout", follow_redirects=False)
+    for response in (
+        test_client.get(pending_url, follow_redirects=False),
+        test_client.post(accept_url, follow_redirects=False),
+        test_client.post(reject_url, follow_redirects=False),
+    ):
+        assert response.status_code == 302
+        assert "/login" in response.headers["Location"]
+
+    # A logged-in non-curator (even the author of the request) gets 403 everywhere.
     _login(test_client, "ds-owner@example.com")
-    owner_attempt = test_client.post(
-        f"/community/{community_id}/datasets/add",
-        data={"dataset_id": owner_dataset_id},
+    assert test_client.get(pending_url).status_code == 403
+    assert test_client.post(accept_url, data={"comment": "let me in"}).status_code == 403
+    assert test_client.post(reject_url, data={"comment": "nope"}).status_code == 403
+    with test_client.application.app_context():
+        assert _get_request(community_id, dataset_id).status == CommunityDatasetRequest.STATUS_PENDING
+        assert CommunityRepository().get_by_id(community_id).datasets == []
+
+    # The curator sees the pending request with a link to the dataset.
+    _login(test_client, "comm-curator@example.com")
+    listing = test_client.get(pending_url)
+    assert listing.status_code == 200
+    body = listing.get_data(as_text=True)
+    assert "Top Hits 2026" in body
+    assert "/doi/10.1234/top-hits/" in body
+    assert "ds-owner@example.com" in body
+
+    # A request cannot be resolved through a different community's URL.
+    assert test_client.post(f"/community/{community_id + 100}/requests/{request_id}/accept").status_code == 404
+
+
+def test_curator_accepts_request_and_dataset_appears_in_community(test_client):
+    ids = _create_community_and_datasets(test_client)
+    community_id = ids["community_id"]
+    dataset_id = ids["owner_dataset_id"]
+    _propose(test_client, community_id, dataset_id)
+    with test_client.application.app_context():
+        request_id = _get_request(community_id, dataset_id).id
+
+    _login(test_client, "comm-curator@example.com")
+    accepted = test_client.post(
+        f"/community/{community_id}/requests/{request_id}/accept",
+        data={"comment": "Welcome aboard"},
         follow_redirects=False,
     )
-    assert owner_attempt.status_code in (302, 303)
+    assert accepted.status_code in (302, 303)
+    with test_client.application.app_context():
+        req = _get_request(community_id, dataset_id)
+        assert req.status == CommunityDatasetRequest.STATUS_ACCEPTED
+        assert req.comment == "Welcome aboard"
+        assert req.resolved_by.email == "comm-curator@example.com"
+        assert [d.id for d in CommunityRepository().get_by_id(community_id).datasets] == [dataset_id]
 
-    # Owner cannot add the curator's dataset either -> 403.
-    owner_on_theirs = test_client.post(
-        f"/community/{community_id}/datasets/add",
-        data={"dataset_id": curator_dataset_id},
-        follow_redirects=False,
+    # No longer pending, and cannot be resolved a second time.
+    assert "There are no pending requests" in test_client.get(f"/community/{community_id}/requests").get_data(
+        as_text=True
     )
-    assert owner_on_theirs.status_code == 403
+    again = test_client.post(
+        f"/community/{community_id}/requests/{request_id}/reject",
+        data={"comment": "changed my mind"},
+        follow_redirects=True,
+    )
+    assert "already been resolved" in again.get_data(as_text=True)
+    with test_client.application.app_context():
+        assert _get_request(community_id, dataset_id).status == CommunityDatasetRequest.STATUS_ACCEPTED
 
+    # The accepted dataset is shown on the community page (even to anonymous visitors) and the dataset page.
+    test_client.get("/logout", follow_redirects=False)
     community_page = test_client.get(f"/community/{community_id}")
     assert community_page.status_code == 200
     assert "Top Hits 2026" in community_page.get_data(as_text=True)
+    assert "SoundHub Community" in test_client.get("/doi/10.1234/top-hits/").get_data(as_text=True)
 
-    dataset_page = test_client.get("/doi/10.1234/top-hits/")
-    assert dataset_page.status_code == 200
-    assert "SoundHub Community" in dataset_page.get_data(as_text=True)
+    # The author sees the accepted status and the curator's comment.
+    _login(test_client, "ds-owner@example.com")
+    mine = test_client.get("/community/my-requests")
+    assert mine.status_code == 200
+    mine_body = mine.get_data(as_text=True)
+    assert "Accepted" in mine_body
+    assert "Welcome aboard" in mine_body
 
-    # Owner can remove their dataset from the community.
+    # The owner can still remove their dataset from the community.
     remove_resp = test_client.post(
-        f"/community/{community_id}/datasets/{owner_dataset_id}/remove",
+        f"/community/{community_id}/datasets/{dataset_id}/remove",
         follow_redirects=False,
     )
     assert remove_resp.status_code in (302, 303)
     with test_client.application.app_context():
         assert CommunityRepository().get_by_id(community_id).datasets == []
+
+
+def test_curator_rejects_request_and_dataset_stays_out_of_community(test_client):
+    ids = _create_community_and_datasets(test_client)
+    community_id = ids["community_id"]
+    dataset_id = ids["owner_dataset_id"]
+    _propose(test_client, community_id, dataset_id)
+    with test_client.application.app_context():
+        request_id = _get_request(community_id, dataset_id).id
+
+    _login(test_client, "comm-curator@example.com")
+    rejected = test_client.post(
+        f"/community/{community_id}/requests/{request_id}/reject",
+        data={"comment": "Off topic"},
+        follow_redirects=False,
+    )
+    assert rejected.status_code in (302, 303)
+    with test_client.application.app_context():
+        req = _get_request(community_id, dataset_id)
+        assert req.status == CommunityDatasetRequest.STATUS_REJECTED
+        assert req.comment == "Off topic"
+        assert CommunityRepository().get_by_id(community_id).datasets == []
+
+    assert "Top Hits 2026" not in test_client.get(f"/community/{community_id}").get_data(as_text=True)
+
+    # The author sees the rejected status with the reason.
+    _login(test_client, "ds-owner@example.com")
+    mine_body = test_client.get("/community/my-requests").get_data(as_text=True)
+    assert "Rejected" in mine_body
+    assert "Off topic" in mine_body
+
+    # My requests requires login.
+    test_client.get("/logout", follow_redirects=False)
+    anon = test_client.get("/community/my-requests", follow_redirects=False)
+    assert anon.status_code == 302
+    assert "/login" in anon.headers["Location"]
 
 
 def test_manage_curators_by_email_and_permissions(test_client):

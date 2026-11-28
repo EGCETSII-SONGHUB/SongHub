@@ -9,12 +9,24 @@
             <i data-feather="arrow-left" class="center-button-icon"></i>
             Back to communities
         </a>
-        {% if is_curator %}
-            <a href="{{ url_for('community.edit_community', community_id=community.id) }}" class="btn btn-primary btn-sm">
-                <i data-feather="edit" class="center-button-icon"></i>
-                Edit community
-            </a>
-        {% endif %}
+                <div class="d-flex gap-2">
+            {% if current_user.is_authenticated %}
+                <a href="{{ url_for('community.my_requests') }}" class="btn btn-outline-secondary btn-sm">
+                    <i data-feather="list" class="center-button-icon"></i>
+                    My requests
+                </a>
+            {% endif %}
+            {% if is_curator %}
+                <a href="{{ url_for('community.pending_requests', community_id=community.id) }}" class="btn btn-outline-primary btn-sm">
+                    <i data-feather="inbox" class="center-button-icon"></i>
+                    Pending requests
+                </a>
+                <a href="{{ url_for('community.edit_community', community_id=community.id) }}" class="btn btn-primary btn-sm">
+                    <i data-feather="edit" class="center-button-icon"></i>
+                    Edit community
+                </a>
+            {% endif %}
+        </div>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -135,12 +147,12 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title mb-0">Add dataset to community</h5>
+                    <h5 class="card-title mb-0">Propose a dataset</h5>
                 </div>
                 <div class="card-body">
                     {% if current_user.is_authenticated %}
                         {% if available_datasets %}
-                            <form method="POST" action="{{ url_for('community.add_dataset', community_id=community.id) }}">
+                            <form method="POST" action="{{ url_for('community.propose_dataset', community_id=community.id) }}">
                                 {{ add_dataset_form.hidden_tag() }}
                                 <div class="mb-3">
                                     <label for="dataset_id" class="form-label">Select one of your datasets</label>
@@ -150,16 +162,16 @@
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <button type="submit" class="btn btn-primary w-100">Add dataset</button>
+                                <button type="submit" class="btn btn-primary w-100">Send request</button>
                             </form>
                         {% else %}
                             <p class="text-secondary mb-0">
-                                You have no additional datasets available to add to this community.
+                                You have no datasets available to propose to this community.
                             </p>
                         {% endif %}
                     {% else %}
                         <p class="text-secondary mb-0">
-                            <a href="{{ url_for('auth.login') }}">Log in</a> to add your own datasets to this community.
+                            <a href="{{ url_for('auth.login') }}">Log in</a> to propose your own datasets to this community.
                         </p>
                     {% endif %}
                 </div>

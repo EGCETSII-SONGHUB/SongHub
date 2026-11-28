@@ -5,7 +5,7 @@ from flask_login import current_user, login_required
 from splent_framework.utils.form_helpers import form_error, form_success
 
 from app.features.community import community_bp
-from app.features.community.forms import AddCuratorForm, AddDatasetToCommunityForm, CommunityForm
+from app.features.community.forms import AddCuratorForm, AddDatasetToCommunityForm, CommunityForm, ReviewRequestForm
 from app.features.community.services import CommunityService
 
 community_service = CommunityService()
@@ -83,23 +83,87 @@ def edit_community(community_id):
     return render_template("community/edit.html", form=form, community=community, add_curator_form=add_curator_form)
 
 
-@community_bp.route("/community/<int:community_id>/datasets/add", methods=["POST"])
+@community_bp.route("/community/<int:community_id>/datasets/propose", methods=["POST"])
 @login_required
-def add_dataset(community_id):
-    """Add a dataset owned by the current user to *community_id*."""
+def propose_dataset(community_id):
+    """Propose one of the current user's datasets to *community_id* for curator review."""
     community = community_service.get_or_404(community_id)
     form = AddDatasetToCommunityForm()
     if not form.validate_on_submit():
         abort(400)
 
     try:
-        community_service.add_dataset(community=community, dataset_id=form.dataset_id.data, user=current_user)
+        community_service.propose_dataset(community=community, dataset_id=form.dataset_id.data, user=current_user)
     except LookupError:
         abort(404)
     except PermissionError:
         abort(403)
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("community.detail", community_id=community.id))
 
-    return form_success("community.detail", "Dataset added to community successfully", community_id=community.id)
+    return form_success("community.detail", "Request sent. A curator will review it.", community_id=community.id)
+
+
+@community_bp.route("/community/<int:community_id>/requests", methods=["GET"])
+@login_required
+def pending_requests(community_id):
+    """List pending dataset requests; restricted to curators."""
+    community = community_service.get_or_404(community_id)
+    try:
+        requests = community_service.list_pending_requests(community, current_user)
+    except PermissionError:
+        abort(403)
+    return render_template(
+        "community/requests.html",
+        community=community,
+        requests=requests,
+        review_form=ReviewRequestForm(),
+    )
+
+
+def _resolve_request(community_id, request_id, action):
+    community = community_service.get_or_404(community_id)
+    dataset_request = community_service.request_repository.get_by_id(request_id)
+    if dataset_request is None or dataset_request.community_id != community.id:
+        abort(404)
+
+    form = ReviewRequestForm()
+    if not form.validate_on_submit():
+        abort(400)
+
+    try:
+        getattr(community_service, action)(dataset_request, current_user, form.comment.data)
+    except PermissionError:
+        abort(403)
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("community.pending_requests", community_id=community.id))
+
+    message = "Request accepted" if action == "accept_request" else "Request rejected"
+    return form_success("community.pending_requests", message, community_id=community.id)
+
+
+@community_bp.route("/community/<int:community_id>/requests/<int:request_id>/accept", methods=["POST"])
+@login_required
+def accept_request(community_id, request_id):
+    """Accept a pending dataset request; restricted to curators."""
+    return _resolve_request(community_id, request_id, "accept_request")
+
+
+@community_bp.route("/community/<int:community_id>/requests/<int:request_id>/reject", methods=["POST"])
+@login_required
+def reject_request(community_id, request_id):
+    """Reject a pending dataset request; restricted to curators."""
+    return _resolve_request(community_id, request_id, "reject_request")
+
+
+@community_bp.route("/community/my-requests", methods=["GET"])
+@login_required
+def my_requests():
+    """Show the status of the current user's dataset requests."""
+    requests = community_service.list_user_requests(current_user)
+    return render_template("community/my_requests.html", requests=requests)
 
 
 @community_bp.route("/community/<int:community_id>/datasets/<int:dataset_id>/remove", methods=["POST"])

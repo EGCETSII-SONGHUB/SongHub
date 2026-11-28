@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from flask import url_for
 
 from app import db
+from app.features.dataset.models import BaseDataset  # noqa: F401
 
 community_curators = db.Table(
     "community_curators",
@@ -74,3 +75,49 @@ class Community(db.Model):
 
     def __repr__(self) -> str:
         return f"Community<{self.id}: {self.name}>"
+
+
+class CommunityDatasetRequest(db.Model):
+    """A request from a user to add one of their datasets into a community"""
+
+    __tablename__ = "community_dataset_request"
+
+    STATUS_PENDING = "pending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REJECTED = "rejected"
+
+    id = db.Column(db.Integer, primary_key=True)
+    community_id = db.Column(db.Integer, db.ForeignKey("community.id"), nullable=False)
+    requester_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    dataset_id = db.Column(db.Integer, db.ForeignKey("data_set.id"), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default=STATUS_PENDING)
+    comment = db.Column(db.Text, nullable=True)  # comentario opcional
+    created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    community = db.relationship(
+        "Community",
+        backref=db.backref("dataset_requests", lazy=True, cascade="all, delete-orphan"),
+    )
+    dataset = db.relationship("BaseDataset", backref=db.backref("community_requests", lazy=True))
+    requester = db.relationship(
+        "User", foreign_keys=[requester_id], backref=db.backref("community_dataset_requests", lazy=True)
+    )
+    resolved_by = db.relationship("User", foreign_keys=[resolved_by_id])
+
+    def is_pending(self) -> bool:
+        return self.status == self.STATUS_PENDING
+
+    def resolve(self, status: str, curator, comment: str | None = None) -> None:
+        """Mark the request as accepted or rejected. Does not commit"""
+        self.status = status
+        self.resolved_by_id = curator.id
+        self.resolved_at = datetime.now(timezone.utc)
+        self.comment = (comment or "").strip() or None
+
+    def __repr__(self) -> str:
+        return (
+            f"CommunityDatasetRequest<{self.id}: community={self.community_id}, "
+            f"dataset={self.dataset_id} {self.status}>"
+        )

@@ -14,6 +14,13 @@
       MARIADB_USER: "{{ mariadb_user }}"
       MARIADB_PASSWORD: "{{ mariadb_password }}"
       MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
+      MAIL_SERVER: "{{ mail_server }}"
+      MAIL_PORT: "{{ mail_port }}"
+      MAIL_USE_TLS: "{{ mail_use_tls }}"
+      MAIL_USERNAME: "{{ mail_username }}"
+      MAIL_PASSWORD: "{{ mail_password }}"
+      MAIL_DEFAULT_SENDER: "{{ mail_default_sender }}"
+      EMAIL_VERIFICATION_MAX_AGE: "{{ email_verification_max_age }}"
       WORKING_DIR: "{{ working_dir }}"
 
   tasks:
