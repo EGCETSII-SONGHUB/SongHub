@@ -6,8 +6,8 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from splent_framework.configuration.configuration import uploads_folder_name
 from splent_framework.services.BaseService import BaseService
 
-from app.features.auth.models import Role, User
 from app import db
+from app.features.auth.models import Role, User
 from app.features.auth.repositories import UserRepository
 from app.features.email.services import EmailService
 from app.features.profile.models import UserProfile
